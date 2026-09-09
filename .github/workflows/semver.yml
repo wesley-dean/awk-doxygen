@@ -47,7 +47,7 @@ jobs:
           make checksums \
             VERSION="${{ steps.calculate-version.outputs.version-string }}"
           cd dist
-          sha256sum -c doxygen-bash.awk.sha256
+          sha256sum -c doxygen-awk.awk.sha256
 
       - name: Generate release notes
         id: release-notes
@@ -67,5 +67,5 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            dist/doxygen-bash.awk
-            dist/doxygen-bash.awk.sha256
+            dist/doxygen-awk.awk
+            dist/doxygen-awk.awk.sha256

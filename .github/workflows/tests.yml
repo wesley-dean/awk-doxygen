@@ -13,12 +13,21 @@ permissions: read-all
 
 jobs:
   test:
-    name: Test suite
+    name: Test suite (${{ matrix.awk }})
     runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        awk:
+          - mawk
+          - gawk
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # pin@11bd71901bbe5b1630ceea73d27597364c9af683
 
+      - name: Install AWK implementations
+        run: sudo apt-get update && sudo apt-get install --yes gawk mawk
+
       - name: Run test suite
-        run: make test
+        run: make test AWK_BIN="${{ matrix.awk }}"
