@@ -1,4 +1,13 @@
 #!/bin/sh
+## @file run-tests.sh
+## @brief Runs the awk-doxygen behavior-focused regression suite.
+## @details
+## Exercises one selected AWK interpreter against the maintained or generated
+## filter supplied through DOXYGEN_AWK_FILTER.  Successful fixtures, diagnostic
+## fixtures, source-line correspondence, and strict self-documentation are
+## validated with temporary output that is removed on exit.  This harness is
+## maintained shell source and is also used to dogfood the pinned bash-doxygen
+## filter during generated reference documentation builds.
 set -eu
 
 ROOT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
@@ -14,11 +23,39 @@ esac
 
 CASE_COUNT=0
 
+## @fn fail(message)
+## @brief Reports a failed regression assertion and terminates the harness.
+## @details
+## Centralizes TAP-like failure output so individual assertions can stop the
+## suite immediately without duplicating diagnostic and exit behavior.
+## @param message Human-readable assertion failure.
+## @par STDIN
+## Nothing is read from STDIN.
+## @par STDOUT
+## Nothing is written to STDOUT.
+## @par STDERR
+## Writes one `not ok` diagnostic line.
+## @returns The function does not return normally.
+## @retval 1 The harness exits with failure.
 fail() {
     printf 'not ok - %s\n' "$1" >&2
     exit 1
 }
 
+## @fn normalize_warnings(path)
+## @brief Removes source-location prefixes from filter diagnostics.
+## @details
+## Golden diagnostic fixtures describe stable warning text rather than temporary
+## source paths and record prefixes.  This helper strips the generated prefix
+## before a diagnostic result is compared with its expected file.
+## @param path File containing raw filter diagnostics.
+## @par STDIN
+## Nothing is read from STDIN.
+## @par STDOUT
+## Writes normalized diagnostic text.
+## @par STDERR
+## Inherits diagnostics from `sed` if normalization cannot be performed.
+## @returns The exit status from `sed`.
 normalize_warnings() {
     sed 's/^.*: warning: //' "$1"
 }
