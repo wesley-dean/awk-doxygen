@@ -3,15 +3,20 @@
 ## @brief Converts documented AWK functions into Doxygen-friendly declarations.
 ## @details
 ## Implements the documentation-led subset governed by ADRs 001 through 003.
-## The filter recognizes file blocks and single-line named AWK function
-## declarations, validates @fn, @param, and @local metadata, and emits
-## line-based Doxygen comments plus synthetic AwkValue declarations.  It does
-## not implement @var or @rule yet.  The implementation uses portable AWK
-## language features; diagnostics are written to /dev/stderr on Unix-like hosts.
+## The filter recognizes file blocks and portable named AWK function
+## declarations, validates @fn, @param, and @local metadata, and emits line-based
+## Doxygen comments plus synthetic AwkValue declarations.  A function opening
+## brace may appear on the declaration line or after one or more intervening
+## newline/comment-only lines.  Formal lists themselves remain single-line.
+## The filter does not implement @var or @rule yet.  The implementation uses
+## portable AWK language features; diagnostics are written to /dev/stderr on
+## Unix-like hosts.
 
 BEGIN {
     strict = (strict ? strict : 0)
     keep_blanks = (compact ? 0 : 1)
+    pending_function = 0
+    pending_gap_count = 0
 
     for (arg_index = 1; arg_index < ARGC; arg_index++) {
         if (ARGV[arg_index] == "--strict") {
@@ -182,6 +187,55 @@ function is_blank(line) {
     return (line ~ /^[ \t]*$/)
 }
 
+## @fn is_comment_only(line)
+## @brief Determines whether a source line contains only an AWK comment.
+## @details
+## Leading horizontal whitespace is accepted.  While a documented function is
+## waiting for its opening brace, comment-only lines are treated as intervening
+## newlines rather than as new documentation blocks.
+##
+## @param line Source line to inspect.
+##
+## @par STDIN
+## Nothing is read directly from STDIN.
+## @par STDOUT
+## Nothing is written to STDOUT.
+## @par STDERR
+## Nothing is written to STDERR.
+##
+## @returns A numeric truth value.
+## @retval 1 The line contains only a comment.
+## @retval 0 The line contains non-comment source content.
+function is_comment_only(line) {
+    return (line ~ /^[ \t]*#/)
+}
+
+## @fn is_open_brace_line(line)
+## @brief Determines whether a source line is an opening function brace.
+## @details
+## Accepts horizontal whitespace and an optional trailing AWK comment around a
+## brace that otherwise occupies the line by itself.
+##
+## @param line Source line to inspect.
+## @local source Mutable copy used while removing comments and whitespace.
+##
+## @par STDIN
+## Nothing is read directly from STDIN.
+## @par STDOUT
+## Nothing is written to STDOUT.
+## @par STDERR
+## Nothing is written to STDERR.
+##
+## @returns A numeric truth value.
+## @retval 1 The line is a standalone opening brace.
+## @retval 0 The line contains other source content.
+function is_open_brace_line(line,    source) {
+    source = line
+    sub(/[ \t]*#.*/, "", source)
+    source = trim(source)
+    return (source == "{")
+}
+
 ## @fn is_doc_line(line)
 ## @brief Determines whether a source line uses the maintained `##` dialect.
 ## @details
@@ -331,13 +385,14 @@ function add_doc_line(line,    content, meta) {
 }
 
 ## @fn parse_function_decl(line, info)
-## @brief Parses the governed single-line AWK function declaration form.
+## @brief Parses the governed portable AWK function declaration forms.
 ## @details
-## Accepts portable declarations shaped as `function name(formals) {` with
-## optional horizontal whitespace and an optional trailing source comment.
-## Stores the function name, formal count, and declaration-order names in the
-## supplied metadata array.  Multiline declarations are outside this initial
-## implementation scope.
+## Accepts a complete parenthesized formal list on one physical line.  The
+## opening brace may appear on that same line or on a later line after only
+## newline/comment-only separators, matching the portable AWK grammar.  Newlines
+## within the formal list are intentionally outside this parser boundary.
+## Stores the function name, formal count, declaration-order names, and whether
+## the opening brace is present or pending in the supplied metadata array.
 ##
 ## @param line Source line that may contain an AWK function declaration.
 ## @param info Array populated with parsed declaration metadata.
@@ -360,8 +415,8 @@ function add_doc_line(line,    content, meta) {
 ## Nothing is written to STDERR.
 ##
 ## @returns A numeric truth value.
-## @retval 1 The line is a recognized function declaration.
-## @retval 0 The line is outside the governed declaration form.
+## @retval 1 The line is a recognized function declaration or function header.
+## @retval 0 The line is outside the governed declaration forms.
 function parse_function_decl(line, info,    source, name, open_pos, close_pos, params, tail, count, idx, formal, parts) {
     clear_array(info)
     source = line
@@ -386,7 +441,11 @@ function parse_function_decl(line, info,    source, name, open_pos, close_pos, p
     }
 
     tail = trim(substr(source, close_pos + 1))
-    if (tail !~ /^\{[ \t]*$/) {
+    if (tail == "{") {
+        info["brace"] = "same"
+    } else if (tail == "") {
+        info["brace"] = "pending"
+    } else {
         return 0
     }
 
@@ -709,6 +768,33 @@ function flush_unmatched_docs(reason) {
 {
     source_line = $0
 
+    if (pending_function) {
+        if (is_blank(source_line) || is_comment_only(source_line)) {
+            pending_gap_count++
+            next
+        }
+
+        if (is_open_brace_line(source_line)) {
+            emit_function(function_info)
+            for (pending_index = 0; pending_index <= pending_gap_count; pending_index++) {
+                emit_blank()
+            }
+            clear_array(function_info)
+            reset_doc()
+            pending_function = 0
+            pending_gap_count = 0
+            next
+        }
+
+        flush_unmatched_docs("function declaration " function_info["name"] " was not followed by an opening brace")
+        for (pending_index = 0; pending_index <= pending_gap_count; pending_index++) {
+            emit_blank()
+        }
+        clear_array(function_info)
+        pending_function = 0
+        pending_gap_count = 0
+    }
+
     if (is_doc_line(source_line)) {
         add_doc_line(source_line)
         next
@@ -735,9 +821,15 @@ function flush_unmatched_docs(reason) {
                 if (doc_name != "" && doc_name != function_info["name"]) {
                     fail_or_warn("@fn documents " doc_name " but declaration is " function_info["name"])
                 }
-                emit_function(function_info)
-                clear_array(function_info)
-                reset_doc()
+
+                if (function_info["brace"] == "same") {
+                    emit_function(function_info)
+                    clear_array(function_info)
+                    reset_doc()
+                } else {
+                    pending_function = 1
+                    pending_gap_count = 0
+                }
                 next
             }
         } else {
@@ -753,6 +845,16 @@ function flush_unmatched_docs(reason) {
 }
 
 END {
+    if (pending_function) {
+        flush_unmatched_docs("function declaration " function_info["name"] " reached end of file before an opening brace")
+        for (pending_index = 0; pending_index <= pending_gap_count; pending_index++) {
+            emit_blank()
+        }
+        clear_array(function_info)
+        pending_function = 0
+        pending_gap_count = 0
+    }
+
     if (doc_count > 0) {
         if (!flush_file_docs()) {
             flush_unmatched_docs("documentation block reached end of file without a function declaration")
