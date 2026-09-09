@@ -58,11 +58,14 @@ to read, but whitespace itself does not create an AWK semantic boundary.
 
 ## Implemented scope
 
-The initial filter implements the governed function-focused scope from ADRs 001
-through 003:
+The filter implements the governed function-focused scope from ADRs 001 through
+003:
 
 - file-level `@file` documentation;
-- single-line named AWK declarations shaped as `function name(formals) {`;
+- named AWK function headers whose complete parenthesized formal list appears on
+  one physical line;
+- an opening function brace on the header line or on a later line after only
+  newline/comment-only separators;
 - zero or more caller-visible `@param` formals;
 - zero or more conventional `@local` formals;
 - validation of `@fn` names against actual AWK function names;
@@ -76,6 +79,22 @@ through 003:
   parameters only; and
 - default line-preserving output plus compact output.
 
+Both of these portable declaration layouts are supported:
+
+```awk
+function normalize(value,    result) {
+```
+
+```awk
+function normalize(value,    result)
+{
+```
+
+Blank lines or comment-only lines may appear between the function header and the
+opening brace.  In default mode they remain blank placeholders in generated
+output, while the synthesized Doxygen declaration stays on the original function
+header line.
+
 The generated pseudo-type `AwkValue` is deliberately synthetic.  It gives
 Doxygen a stable shape to index and is not a claim that AWK has static types.
 
@@ -84,9 +103,11 @@ constructs are not emitted by this implementation yet.  A documented `@var` or
 `@rule` association therefore produces a diagnostic rather than speculative
 Doxygen structure.
 
-Multiline function declarations are also outside the current parser boundary.
-Expanding that boundary should be governed and regression-tested rather than
-introduced incidentally.
+Formal lists split across physical lines remain outside the current parser
+boundary.  POSIX explicitly permits newlines before the opening function brace,
+but its function grammar does not make arbitrary newlines part of the formal
+list.  The filter therefore does not broaden its portable-AWK claim based on
+implementation-specific continuation behavior.
 
 ## Manual usage
 
@@ -112,7 +133,7 @@ This is useful in CI when documentation drift should fail validation.
 `--compact` suppresses blank placeholder lines.  Default mode emits a
 one-for-one line representation for valid translated source wherever practical,
 so generated declarations remain on the same line number as their AWK
-function declarations.
+function headers.
 
 ## Doxyfile usage
 
@@ -144,6 +165,7 @@ including:
 - duplicate formal documentation;
 - documentation order that differs from declaration order;
 - a caller-visible `@param` appearing after a documented `@local`;
+- a deferred function header that is not followed by an opening brace;
 - a documentation block separated from its function declaration;
 - a documentation block not followed by a recognized function declaration; and
 - currently unsupported `@var` or `@rule` associations.
@@ -199,11 +221,12 @@ CI exercises both `mawk` and GNU awk.  The active AWK suite uses small
 behavior-focused fixtures under `tests/awk/` and runs the same semantic cases
 against the maintained source and generated consumer artifact.
 
-The suite currently covers file documentation, zero-parameter functions,
-caller-visible parameters, conventional locals, a conventional local array,
-descriptive Doxygen directives, ignored undocumented source, validation
-failures, default source-line correspondence, compact output, and strict
-self-validation of the filter's own governed function documentation.
+The suite covers file documentation, zero-parameter functions, caller-visible
+parameters, conventional locals, a conventional local array, portable next-line
+function braces, comment-separated opening braces, descriptive Doxygen
+directives, ignored undocumented source, validation failures, default source-line
+correspondence, compact output, and strict self-validation of the filter's own
+governed function documentation.
 
 The inherited Bash fixtures remain in the repository only as inactive historical
 scaffolding and are not referenced by the AWK regression harness.
