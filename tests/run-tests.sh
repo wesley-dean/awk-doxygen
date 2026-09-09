@@ -129,6 +129,26 @@ fi
 CASE_COUNT=$((CASE_COUNT + 1))
 printf '%s\n' 'ok - mode: global source line correspondence'
 
+# A generated rule declaration must occupy the associated AWK rule-header line,
+# while source-only @rule metadata remains a blank placeholder.
+input="$ROOT_DIR/tests/awk/fixtures/rule-pattern-action.awk"
+actual="$TMP_DIR/rule-lines.cpp"
+errors="$TMP_DIR/rule-lines.err"
+"$AWK_BIN" -f "$FILTER" "$input" >"$actual" 2>"$errors"
+test ! -s "$errors" || fail 'documented rule emitted a diagnostic'
+expected_lines=$(wc -l <"$input" | tr -d ' ')
+actual_lines=$(wc -l <"$actual" | tr -d ' ')
+test "$actual_lines" -eq "$expected_lines" || fail 'documented rule did not preserve source line count'
+source_rule_line=$(grep -n '^/.*{[[:space:]]*$' "$input" | head -n 1 | cut -d: -f1)
+output_rule_line=$(grep -n '^static void awk_doxygen_rule_comment_lines();$' "$actual" | cut -d: -f1)
+test "$source_rule_line" = "$output_rule_line" || fail 'generated rule declaration moved from its source header line'
+source_meta_line=$(grep -n '^## @rule comment_lines$' "$input" | cut -d: -f1)
+if sed -n "${source_meta_line}p" "$actual" | grep -q '[^[:space:]]'; then
+    fail 'source @rule metadata was not suppressed'
+fi
+CASE_COUNT=$((CASE_COUNT + 1))
+printf '%s\n' 'ok - mode: rule source line correspondence'
+
 # Undocumented input should remain entirely blank in default mode.
 input="$ROOT_DIR/tests/awk/fixtures/undocumented-ignored.awk"
 actual="$TMP_DIR/default-blanks.cpp"
@@ -144,7 +164,7 @@ fi
 CASE_COUNT=$((CASE_COUNT + 1))
 printf '%s\n' 'ok - mode: undocumented blank placeholders'
 
-# The maintained/generated filter must satisfy its own governed function metadata.
+# The maintained/generated filter must satisfy its own governed function and rule metadata.
 actual="$TMP_DIR/self.cpp"
 errors="$TMP_DIR/self.err"
 if ! "$AWK_BIN" -f "$FILTER" -- --strict --compact "$FILTER" >"$actual" 2>"$errors"; then
@@ -152,7 +172,10 @@ if ! "$AWK_BIN" -f "$FILTER" -- --strict --compact "$FILTER" >"$actual" 2>"$erro
 fi
 test ! -s "$errors" || fail 'filter self-documentation emitted a diagnostic'
 grep -q '^AwkValue parse_function_decl(' "$actual" || fail 'self-documentation omitted parser function'
+grep -q '^static void awk_doxygen_begin_initialize_filter();$' "$actual" || fail 'self-documentation omitted BEGIN rule'
+grep -q '^static void awk_doxygen_rule_translate_source_record();$' "$actual" || fail 'self-documentation omitted action-only rule'
+grep -q '^static void awk_doxygen_end_finalize_filter();$' "$actual" || fail 'self-documentation omitted END rule'
 CASE_COUNT=$((CASE_COUNT + 1))
-printf '%s\n' 'ok - self: governed function documentation'
+printf '%s\n' 'ok - self: governed function and rule documentation'
 
 printf 'ok - %s regression cases passed with %s\n' "$CASE_COUNT" "$AWK_BIN"
