@@ -57,19 +57,23 @@ not provide enough information to make a structural claim reliably, require
 explicit documentation metadata or leave the construct undocumented rather than
 inventing semantics.
 
-The implemented baseline is centered on file blocks and single-line named AWK
-function declarations.  Public parameters and conventional omitted-formal
-locals are distinct concepts: `@param` documents caller-supplied formals and
-`@local` documents formals used as local storage by convention.  Every declared
-formal in a documented function must be classified explicitly.
+The implemented baseline is centered on file blocks and named AWK function
+headers whose complete parenthesized formal list appears on one physical line.
+The opening brace may appear on that same line or after newline/comment-only
+separator lines.  Public parameters and conventional omitted-formal locals are
+distinct concepts: `@param` documents caller-supplied formals and `@local`
+documents formals used as local storage by convention.  Every declared formal in
+a documented function must be classified explicitly.
+
+Formal lists split across physical lines remain outside the portable parser
+boundary.  Do not broaden that boundary merely because one supported AWK
+implementation accepts a continuation form that POSIX does not specify in the
+function grammar.
 
 `@var` and `@rule` belong to the maintained documentation vocabulary, but their
 Doxygen representation is not implemented yet.  Do not infer globals, arrays,
 `BEGIN`, `END`, or ordinary pattern/action rules opportunistically.  Expand
 those capabilities only under governing ADRs and focused regression fixtures.
-
-Multiline function declarations are outside the current parser boundary.  A
-change to that boundary should be deliberate and tested as public behavior.
 
 ## Portability
 
@@ -105,8 +109,8 @@ fixtures to implementation details merely to increase apparent coverage.
 
 The same semantic suite must exercise maintained source and the generated
 `dist/doxygen-awk.awk` artifact.  Preserve tests for strict/non-strict
-diagnostics, compact output, source-line correspondence, and self-documentation
-when changing parser structure.
+diagnostics, compact output, source-line correspondence, portable next-line
+function braces, and self-documentation when changing parser structure.
 
 Run the suite with a selected interpreter using, for example:
 
