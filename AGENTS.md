@@ -24,8 +24,8 @@ Before proposing or making changes, review at minimum:
 
 Treat accepted ADRs as governance rather than suggestions.  Do not silently
 contradict, supersede, or work around an accepted ADR.  If a requested change
-conflicts with an existing decision, identify the conflict and determine
-whether a new or superseding ADR is required.
+conflicts with an existing decision, identify the conflict and determine whether
+a new or superseding ADR is required.
 
 ## Documentation Standard
 
@@ -153,6 +153,52 @@ make test AWK_BIN=mawk
 make test AWK_BIN=gawk
 ```
 
+## Documentation Dependencies and Publication
+
+ADR-008 governs generated reference documentation.  Documentation-only external
+artifacts live in `dependencies-docs.txt` and are materialized beneath `vendor/`
+through a directly bootstrapped, SHA-256-pinned bashdeps release.
+
+The stable documentation build intentionally consumes released filters from
+`vendor/`, including the pinned `awk-doxygen` release rather than the repository's
+maintained source file.  This is a downstream-consumer dogfood boundary, not an
+accidental duplication of the local filter.
+
+Use these targets deliberately:
+
+```text
+make deps-docs        synchronize documentation dependencies; may use network
+make deps-docs-check  verify prepared documentation state; no repair
+make docs             generate stable docs from pinned vendored filters
+make docs-canary      generate docs with explicitly selected filter paths
+make docs-clean       remove doc/reference/
+```
+
+`make docs` must not synchronize or repair dependencies.  A fresh checkout should
+run `make deps-docs` first.  `doc/reference/` and `vendor/` are generated state and
+must not be committed.
+
+GitHub Pages regenerates `doc/reference/` from source and publishes that generated
+tree.  It does not require committed HTML.
+
+## Documentation Canaries
+
+ADR-009 separates stable publication from proactive failure detection.
+
+The current-source canary runs on pull requests and `main` and substitutes the
+repository's maintained `doxygen-awk.awk` into the same Doxygen configuration used
+for stable publication.  It should detect source-level integration regressions
+before a release is cut.
+
+The released-artifact canary runs when a GitHub release is published.  It must
+download the exact `doxygen-awk.awk` release asset and checksum, verify those bytes,
+and run the same reference generation with the released artifact.  Do not replace
+this with a tag checkout; packaging and asset publication are part of the consumer
+contract being tested.
+
+Canary success does not automatically update `dependencies-docs.txt`.  Stable
+publication pins change only through normal reviewed repository changes.
+
 ## Build and Release
 
 The maintained consumer source and generated artifact are named:
@@ -169,9 +215,10 @@ Build provenance remains comments rather than executable AWK state.  Do not add
 runtime variables, patterns, or `BEGIN` behavior merely to expose version or
 build metadata.
 
-Automatic release publication is currently disabled during development.  Keep
-the release workflow, artifact names, checksum names, and tested build boundary
-aligned so releases can be enabled deliberately when appropriate.
+Release publication may be enabled only while the release workflow, artifact
+names, checksum names, and tested build boundary remain aligned with ADR-004.
+The documentation release canary provides an additional check of exact published
+filter bytes after each release.
 
 ## Engineering Approach
 

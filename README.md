@@ -241,6 +241,51 @@ different AWK files without becoming one apparent global pseudo-function.
 When strict validation is required through Doxygen itself, use a small wrapper
 that supplies `--strict` to the filter.
 
+## Generated reference documentation
+
+This repository publishes its own Doxygen reference documentation and deliberately
+dogfoods both `awk-doxygen` and `bash-doxygen` while doing so.
+
+Stable documentation dependencies are declared separately from the ordinary build
+in `dependencies-docs.txt`.  A pinned `bashdeps` release materializes the pinned
+filter artifacts beneath `vendor/`.  The current stable pins are `awk-doxygen`
+v0.0.3 and `bash-doxygen` v0.0.14.
+
+Prepare the documentation dependencies with:
+
+```sh
+make deps-docs
+```
+
+Verify them without network access or repair with:
+
+```sh
+make deps-docs-check
+```
+
+Generate the stable reference tree with:
+
+```sh
+make docs
+```
+
+The generated HTML lives under `doc/reference/`, is ignored by Git, and is
+published to GitHub Pages by CI rather than committed to the repository.
+`make docs` consumes already-prepared dependency state; it does not synchronize
+or repair dependencies itself.
+
+Stable Pages generation intentionally uses the released, SHA-256-pinned
+`vendor/doxygen-awk.awk`, not the repository-local filter.  This exercises the
+same consumer boundary downstream projects use.
+
+ADR-009 adds two complementary canaries without moving that stable pin.  Pull
+requests and `main` generate the same reference corpus with current repository
+`doxygen-awk.awk`, providing pre-release integration feedback.  When a release is
+published, a second canary downloads the exact released `doxygen-awk.awk` asset
+and checksum, verifies the bytes, and generates the same reference documentation.
+This catches both source-level regressions before release and packaging failures
+after release while leaving stable Pages publication reproducible.
+
 ## Diagnostics
 
 Diagnostics are written to standard error.  Current validation detects cases
@@ -288,10 +333,9 @@ runtime behavior.
 dist/doxygen-awk.awk.sha256
 ```
 
-Automatic release publication remains disabled during active development.  The
-workflow and artifact naming are nevertheless kept aligned with the governed
-AWK release contract so release publication can be enabled deliberately rather
-than repaired during a release.
+Release automation publishes the generated AWK artifact and its checksum when
+versioning is enabled.  ADR-004 governs that release boundary, while ADR-009 adds
+a post-release canary that verifies and exercises the exact published artifact.
 
 ## Testing
 

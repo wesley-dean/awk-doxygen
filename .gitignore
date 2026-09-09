@@ -101,6 +101,10 @@ tramp
 .cask/
 dist/
 
+# Generated dependency and reference state
+vendor/
+doc/reference/
+
 # Flycheck
 flycheck_*.el
 

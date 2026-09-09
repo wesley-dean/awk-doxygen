@@ -90,3 +90,25 @@ pattern-only rules outside the recognition boundary and requires consumers to
 set `EXTRACT_STATIC = YES` so generated rule entities appear in Doxygen output.
 See
 [`ADR-007`](adr/ADR-007-represent-awk-rules-as-file-local-synthetic-functions.md).
+
+## ADR-008: Publish ephemeral reference documentation with pinned filters
+
+Generated Doxygen HTML is disposable output under `doc/reference/` and is never
+committed merely to support GitHub Pages.  Documentation dependencies are
+isolated in `dependencies-docs.txt`, synchronized through a directly bootstrapped
+and SHA-256-pinned bashdeps release, and consumed from `vendor/`; stable Pages
+publication uses pinned released `awk-doxygen` and `bash-doxygen` artifacts rather
+than repository-local filter source.  Dependency synchronization may use the
+network, while verification and `make docs` remain non-repairing after state is
+prepared.  See
+[`ADR-008`](adr/ADR-008-publish-ephemeral-reference-documentation-with-pinned-filters.md).
+
+## ADR-009: Continuously dogfood current and released filters
+
+Stable Pages publication stays pinned, while two separate canaries detect
+regressions earlier.  Pull-request and `main` CI generate the same reference
+corpus with current repository `doxygen-awk.awk`, and a release-published canary
+downloads, verifies, and exercises the exact released `doxygen-awk.awk` asset.
+Neither canary mutates the stable dependency pin, and both complement rather than
+replace focused parser fixtures.  See
+[`ADR-009`](adr/ADR-009-continuously-dogfood-current-and-released-filters.md).

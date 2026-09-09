@@ -1,0 +1,91 @@
+---
+name: Documentation canary
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  current-source:
+    name: Current-source dogfood
+    if: github.event_name != 'release'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install documentation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes curl doxygen graphviz make
+
+      - name: Prepare stable documentation dependencies
+        run: make deps-docs
+
+      - name: Verify prepared dependency state
+        run: make deps-docs-check
+
+      - name: Generate docs with current awk-doxygen source
+        run: |
+          make docs-canary \
+            AWK_DOXYGEN_FILTER=doxygen-awk.awk \
+            BASH_DOXYGEN_FILTER=vendor/doxygen-bash.awk
+
+  released-artifact:
+    name: Released-artifact dogfood
+    if: github.event_name == 'release'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout released revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Install documentation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes curl doxygen graphviz make
+
+      - name: Prepare stable Bash documentation dependency
+        run: make deps-docs
+
+      - name: Download exact released AWK filter and checksum
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          mkdir -p .release-canary
+          base="https://github.com/${REPOSITORY}/releases/download/${RELEASE_TAG}"
+          curl --fail --location --silent --show-error \
+            --retry 5 --retry-all-errors --retry-delay 2 \
+            "${base}/doxygen-awk.awk" \
+            --output .release-canary/doxygen-awk.awk
+          curl --fail --location --silent --show-error \
+            --retry 5 --retry-all-errors --retry-delay 2 \
+            "${base}/doxygen-awk.awk.sha256" \
+            --output .release-canary/doxygen-awk.awk.sha256
+
+      - name: Verify released AWK filter bytes
+        run: |
+          cd .release-canary
+          sha256sum -c doxygen-awk.awk.sha256
+
+      - name: Verify prepared dependency state
+        run: make deps-docs-check
+
+      - name: Generate docs with exact released AWK filter
+        run: |
+          make docs-canary \
+            AWK_DOXYGEN_FILTER=.release-canary/doxygen-awk.awk \
+            BASH_DOXYGEN_FILTER=vendor/doxygen-bash.awk
