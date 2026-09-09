@@ -1,16 +1,16 @@
 #!/usr/bin/awk -f
 ## @file doxygen-awk.awk
-## @brief Converts documented AWK functions into Doxygen-friendly declarations.
+## @brief Converts documented AWK constructs into Doxygen-friendly declarations.
 ## @details
-## Implements the documentation-led subset governed by ADRs 001 through 003.
-## The filter recognizes file blocks and portable named AWK function
-## declarations, validates @fn, @param, and @local metadata, and emits line-based
-## Doxygen comments plus synthetic AwkValue declarations.  A function opening
-## brace may appear on the declaration line or after one or more intervening
-## newline/comment-only lines.  Formal lists themselves remain single-line.
-## The filter does not implement @var or @rule yet.  The implementation uses
-## portable AWK language features; diagnostics are written to /dev/stderr on
-## Unix-like hosts.
+## Implements the documentation-led subset governed by ADRs 001 through 003 and
+## ADR-006.  The filter recognizes file blocks, portable named AWK function
+## declarations, and explicitly documented global variables or arrays.  It
+## validates @fn, @param, @local, and @var metadata and emits line-based Doxygen
+## comments plus synthetic AwkValue declarations.  A function opening brace may
+## appear on the declaration line or after newline/comment-only lines.  Formal
+## lists themselves remain single-line.  The filter does not implement @rule
+## yet.  The implementation uses portable AWK language features; diagnostics are
+## written to /dev/stderr on Unix-like hosts.
 
 BEGIN {
     strict = (strict ? strict : 0)
@@ -285,10 +285,11 @@ function strip_doc_marker(line,    value) {
 ## @brief Extracts the documented identity from a structural Doxygen directive.
 ## @details
 ## Removes the directive token, surrounding whitespace, and any parenthesized
-## function signature so source `@fn name(args)` resolves to `name`.
+## function signature so source `@fn name(args)` resolves to `name`.  A
+## structural directive with no identity resolves to the empty string.
 ##
 ## @param meta Trimmed documentation line.
-## @param directive Structural directive such as `@fn`.
+## @param directive Structural directive such as `@fn` or `@var`.
 ## @local value Mutable text used while extracting the symbol.
 ##
 ## @par STDIN
@@ -301,11 +302,33 @@ function strip_doc_marker(line,    value) {
 ## @returns The documented symbol name, or the empty string when absent.
 function parse_doc_symbol(meta, directive,    value) {
     value = meta
-    sub("^" directive "[ \t]+", "", value)
+    sub("^" directive "([ \t]+|$)", "", value)
     value = trim(value)
     sub(/[ \t].*$/, "", value)
     sub(/\(.*/, "", value)
     return value
+}
+
+## @fn is_valid_identifier(name)
+## @brief Determines whether a name is a portable AWK identifier.
+## @details
+## Applies the identifier boundary governed by ADR-006 for documented globals.
+## The same lexical shape is also used by the function parser.
+##
+## @param name Candidate identifier.
+##
+## @par STDIN
+## Nothing is read directly from STDIN.
+## @par STDOUT
+## Nothing is written to STDOUT.
+## @par STDERR
+## Nothing is written to STDERR.
+##
+## @returns A numeric truth value.
+## @retval 1 The name is a valid portable AWK identifier.
+## @retval 0 The name is empty or contains unsupported characters.
+function is_valid_identifier(name) {
+    return (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/)
 }
 
 ## @fn parse_formal_name(meta, directive)
@@ -337,8 +360,8 @@ function parse_formal_name(meta, directive,    value) {
 ## @fn add_doc_line(line)
 ## @brief Buffers one documentation line and records structural metadata.
 ## @details
-## Recognizes `@file`, `@fn`, `@param`, and `@local` for implemented behavior.
-## `@var` and `@rule` are recognized only so unsupported associations can be
+## Recognizes `@file`, `@fn`, `@param`, `@local`, and `@var` for implemented
+## behavior.  `@rule` is recognized only so unsupported associations can be
 ## diagnosed rather than emitted as false Doxygen structure.
 ##
 ## @param line Documentation source line.
@@ -365,7 +388,7 @@ function add_doc_line(line,    content, meta) {
     } else if (meta ~ /^@fn[ \t]+/) {
         doc_kind = "fn"
         doc_name = parse_doc_symbol(meta, "@fn")
-    } else if (meta ~ /^@var[ \t]+/) {
+    } else if (meta ~ /^@var([ \t]|$)/) {
         doc_kind = "var"
         doc_name = parse_doc_symbol(meta, "@var")
     } else if (meta ~ /^@rule[ \t]+/) {
@@ -490,6 +513,26 @@ function docs_are_file_only() {
     return (doc_count > 0 && doc_kind == "file")
 }
 
+## @fn docs_are_var_only()
+## @brief Determines whether the current buffer is a standalone global block.
+## @details
+## A `@var` block is authoritative documentation under ADR-006 and does not
+## require a following AWK assignment or declaration.
+##
+## @par STDIN
+## Nothing is read directly from STDIN.
+## @par STDOUT
+## Nothing is written to STDOUT.
+## @par STDERR
+## Nothing is written to STDERR.
+##
+## @returns A numeric truth value.
+## @retval 1 The buffer contains a documented global variable or array.
+## @retval 0 The buffer is not a standalone `@var` block.
+function docs_are_var_only() {
+    return (doc_count > 0 && doc_kind == "var")
+}
+
 ## @fn emit_doc_lines(suppress_structural)
 ## @brief Emits buffered documentation as line-oriented Doxygen comments.
 ## @details
@@ -519,6 +562,55 @@ function emit_doc_lines(suppress_structural,    idx, line, meta) {
             (meta ~ /^@fn([ \t]|$)/ || meta ~ /^@local([ \t]|$)/ ||
              meta ~ /^@var([ \t]|$)/ || meta ~ /^@rule([ \t]|$)/)) {
             emit_blank()
+        } else if (line == "") {
+            print "///"
+        } else {
+            print "/// " line
+        }
+    }
+}
+
+## @fn emit_var_docs()
+## @brief Emits one documented AWK global as a Doxygen structural variable.
+## @details
+## Rewrites the maintained `@var name` line to `@var AwkValue name` so Doxygen
+## receives an explicit pseudo-declaration without requiring an AWK assignment.
+## The generic pseudo-type makes no scalar-versus-array claim.  Invalid names are
+## diagnosed and replaced by an inline Doxygen warning so default-mode line
+## correspondence remains intact.
+##
+## @local idx Current documentation-line index.
+## @local line Buffered documentation content.
+## @local meta Trimmed content used to locate the structural `@var` directive.
+## @local valid Numeric flag indicating whether the documented name is valid.
+##
+## @par STDIN
+## Nothing is read directly from STDIN.
+## @par STDOUT
+## Writes the translated variable documentation one source line at a time.
+## @par STDERR
+## Writes a diagnostic when the documented variable identity is invalid.
+##
+## @returns No meaningful value; callers use the function for output.
+function emit_var_docs(    idx, line, meta, valid) {
+    valid = is_valid_identifier(doc_name)
+    if (!valid) {
+        if (doc_name == "") {
+            fail_or_warn("invalid @var name")
+        } else {
+            fail_or_warn("invalid @var name " doc_name)
+        }
+    }
+
+    for (idx = 1; idx <= doc_count; idx++) {
+        line = doc_lines[idx]
+        meta = trim(line)
+        if (meta ~ /^@var([ \t]|$)/) {
+            if (valid) {
+                print "/// @var AwkValue " doc_name
+            } else {
+                print "/// @warning Invalid @var declaration was not emitted."
+            }
         } else if (line == "") {
             print "///"
         } else {
@@ -737,11 +829,36 @@ function flush_file_docs() {
     return 0
 }
 
+## @fn flush_var_docs()
+## @brief Emits a standalone documented global variable or array block.
+## @details
+## `@var` is authoritative under ADR-006, so the block is translated when it
+## ends rather than waiting for an AWK assignment or other declaration anchor.
+##
+## @par STDIN
+## Nothing is read directly from STDIN.
+## @par STDOUT
+## Writes the buffered variable documentation as Doxygen line comments.
+## @par STDERR
+## Writes a diagnostic when the documented variable name is invalid.
+##
+## @returns A numeric truth value.
+## @retval 1 Variable documentation was emitted and the buffer was reset.
+## @retval 0 The current buffer was not a standalone `@var` block.
+function flush_var_docs() {
+    if (docs_are_var_only()) {
+        emit_var_docs()
+        reset_doc()
+        return 1
+    }
+    return 0
+}
+
 ## @fn flush_unmatched_docs(reason)
-## @brief Reports documentation that could not be associated with a function.
+## @brief Reports documentation that could not be associated with a construct.
 ## @details
 ## Preserves the source documentation for downstream visibility and appends a
-## generated Doxygen warning explaining that no governed AWK function was
+## generated Doxygen warning explaining that no governed AWK construct was
 ## associated with the block.
 ##
 ## @param reason Diagnostic reason reported by the filter.
@@ -749,7 +866,7 @@ function flush_file_docs() {
 ## @par STDIN
 ## Nothing is read directly from STDIN.
 ## @par STDOUT
-## Writes the unmatched documentation and one generated Doxygen warning line.
+## Writes unmatched documentation and one generated Doxygen warning line.
 ## @par STDERR
 ## Writes the filter diagnostic.
 ##
@@ -760,7 +877,7 @@ function flush_unmatched_docs(reason) {
             fail_or_warn(reason)
         }
         emit_doc_lines(1)
-        print "/// @warning No recognized AWK function was associated with this documentation block."
+        print "/// @warning No recognized AWK construct was associated with this documentation block."
         reset_doc()
     }
 }
@@ -802,7 +919,7 @@ function flush_unmatched_docs(reason) {
 
     if (doc_count > 0) {
         if (is_blank(source_line)) {
-            if (flush_file_docs()) {
+            if (flush_file_docs() || flush_var_docs()) {
                 emit_blank()
                 next
             }
@@ -811,7 +928,7 @@ function flush_unmatched_docs(reason) {
             next
         }
 
-        if (flush_file_docs()) {
+        if (flush_file_docs() || flush_var_docs()) {
             emit_blank()
             next
         }
@@ -856,8 +973,8 @@ END {
     }
 
     if (doc_count > 0) {
-        if (!flush_file_docs()) {
-            flush_unmatched_docs("documentation block reached end of file without a function declaration")
+        if (!flush_file_docs() && !flush_var_docs()) {
+            flush_unmatched_docs("documentation block reached end of file without a recognized AWK construct")
         }
     }
 
