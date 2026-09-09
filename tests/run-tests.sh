@@ -85,6 +85,30 @@ test "$source_decl_line" = "$output_decl_line" || fail 'generated declaration mo
 CASE_COUNT=$((CASE_COUNT + 1))
 printf '%s\n' 'ok - mode: source line correspondence'
 
+# A deferred opening brace must preserve the original header line and all
+# intervening newline/comment lines in default mode.
+input="$ROOT_DIR/tests/awk/fixtures/function-brace-after-comment.awk"
+actual="$TMP_DIR/multiline-lines.cpp"
+errors="$TMP_DIR/multiline-lines.err"
+"$AWK_BIN" -f "$FILTER" "$input" >"$actual" 2>"$errors"
+test ! -s "$errors" || fail 'multiline function emitted a diagnostic'
+expected_lines=$(wc -l <"$input" | tr -d ' ')
+actual_lines=$(wc -l <"$actual" | tr -d ' ')
+test "$actual_lines" -eq "$expected_lines" || fail 'multiline function did not preserve source line count'
+source_decl_line=$(grep -n '^function normalize' "$input" | cut -d: -f1)
+output_decl_line=$(grep -n '^AwkValue normalize' "$actual" | cut -d: -f1)
+test "$source_decl_line" = "$output_decl_line" || fail 'multiline generated declaration moved from its source header line'
+comment_line=$(grep -n '^# Keep the opening brace' "$input" | cut -d: -f1)
+brace_line=$(grep -n '^{' "$input" | head -n 1 | cut -d: -f1)
+if sed -n "${comment_line}p" "$actual" | grep -q '[^[:space:]]'; then
+    fail 'multiline comment placeholder was not blank'
+fi
+if sed -n "${brace_line}p" "$actual" | grep -q '[^[:space:]]'; then
+    fail 'multiline brace placeholder was not blank'
+fi
+CASE_COUNT=$((CASE_COUNT + 1))
+printf '%s\n' 'ok - mode: multiline source line correspondence'
+
 # Undocumented input should remain entirely blank in default mode.
 input="$ROOT_DIR/tests/awk/fixtures/undocumented-ignored.awk"
 actual="$TMP_DIR/default-blanks.cpp"
