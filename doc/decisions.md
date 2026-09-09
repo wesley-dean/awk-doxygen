@@ -65,3 +65,15 @@ be supported by more than one AWK implementation where practical, and inherited
 Bash fixtures are transitional scaffolding rather than evidence of AWK support.
 See
 [`ADR-005`](adr/ADR-005-use-small-behavior-focused-regression-fixtures.md).
+
+## ADR-006: Treat @var as authoritative global documentation
+
+A maintained `@var` block is itself the authoritative documentation declaration
+for one significant AWK global variable or array; no following assignment or
+first use is required or inferred.  The filter rewrites the structural line to a
+Doxygen declaration such as `@var AwkValue name`, preserving source-line
+correspondence while keeping scalar-versus-array shape, lifecycle, ownership,
+and mutability in maintained prose.  `@var` names must be valid portable AWK
+identifiers, and conventional function-local formals remain governed by
+`@local`.  See
+[`ADR-006`](adr/ADR-006-treat-var-as-authoritative-global-documentation.md).

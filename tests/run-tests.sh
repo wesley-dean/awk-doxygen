@@ -109,6 +109,26 @@ fi
 CASE_COUNT=$((CASE_COUNT + 1))
 printf '%s\n' 'ok - mode: multiline source line correspondence'
 
+# A standalone @var declaration must remain on its source line and must not
+# consume an adjacent AWK statement as an inferred declaration.
+input="$ROOT_DIR/tests/awk/fixtures/variable-unrelated-following.awk"
+actual="$TMP_DIR/variable-lines.cpp"
+errors="$TMP_DIR/variable-lines.err"
+"$AWK_BIN" -f "$FILTER" "$input" >"$actual" 2>"$errors"
+test ! -s "$errors" || fail 'documented global emitted a diagnostic'
+expected_lines=$(wc -l <"$input" | tr -d ' ')
+actual_lines=$(wc -l <"$actual" | tr -d ' ')
+test "$actual_lines" -eq "$expected_lines" || fail 'documented global did not preserve source line count'
+source_var_line=$(grep -n '^## @var record_count' "$input" | cut -d: -f1)
+output_var_line=$(grep -n '^/// @var AwkValue record_count' "$actual" | cut -d: -f1)
+test "$source_var_line" = "$output_var_line" || fail 'generated @var moved from its source line'
+source_code_line=$(grep -n '^other_count = 0' "$input" | cut -d: -f1)
+if sed -n "${source_code_line}p" "$actual" | grep -q '[^[:space:]]'; then
+    fail 'documented global consumed unrelated following source'
+fi
+CASE_COUNT=$((CASE_COUNT + 1))
+printf '%s\n' 'ok - mode: global source line correspondence'
+
 # Undocumented input should remain entirely blank in default mode.
 input="$ROOT_DIR/tests/awk/fixtures/undocumented-ignored.awk"
 actual="$TMP_DIR/default-blanks.cpp"
