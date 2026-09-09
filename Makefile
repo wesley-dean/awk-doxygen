@@ -1,4 +1,4 @@
-# Canonical build, validation, and release-artifact entry points.
+# Canonical build, validation, documentation, and release-artifact entry points.
 
 SHELL := /bin/sh
 .SHELLFLAGS := -eu -c
@@ -9,11 +9,23 @@ DIST_FILTER := $(DIST_DIR)/doxygen-awk.awk
 DIST_CHECKSUM := $(DIST_FILTER).sha256
 AWK_BIN ?= awk
 
+VENDOR_DIR := vendor
+DOCS_MANIFEST := dependencies-docs.txt
+BASHDEPS := $(VENDOR_DIR)/bashdeps.bash
+BASHDEPS_VERSION := 0.0.10
+BASHDEPS_URL := https://github.com/wesley-dean/bashdeps/releases/download/v$(BASHDEPS_VERSION)/bashdeps.bash
+BASHDEPS_SHA256 := acbe79d39ab8cbbf906bd864d410ba7a223ba6f09501c02a409b8d3aa8740462
+VENDOR_AWK_FILTER := $(VENDOR_DIR)/doxygen-awk.awk
+VENDOR_BASH_FILTER := $(VENDOR_DIR)/doxygen-bash.awk
+REFERENCE_DOC_DIR := doc/reference
+AWK_DOXYGEN_FILTER ?= $(VENDOR_AWK_FILTER)
+BASH_DOXYGEN_FILTER ?= $(VENDOR_BASH_FILTER)
+
 VERSION ?= $(shell git describe --tags --always 2>/dev/null || printf '0.0.0-dev')
 BUILD_COMMIT ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || printf 'unknown')
 BUILD_DATE ?= $(shell git show -s --format=%cI HEAD 2>/dev/null || printf 'unknown')
 
-.PHONY: all build checksums clean test test-source test-dist
+.PHONY: all build checksums clean deps-docs deps-docs-check distclean docs docs-canary docs-clean test test-source test-dist verify-bashdeps FORCE
 
 all: build
 
@@ -59,6 +71,82 @@ test-dist: build
 checksums: build
 	cd "$(DIST_DIR)" && sha256sum "$(notdir $(DIST_FILTER))" >"$(notdir $(DIST_CHECKSUM))"
 
-clean:
+FORCE:
+
+## Bootstrap only bashdeps directly, verifying pinned bytes before execution.
+$(BASHDEPS): FORCE
+	@mkdir -p "$(VENDOR_DIR)"
+	@verify_hash() { \
+		path=$$1; \
+		if command -v sha256sum >/dev/null 2>&1; then \
+			printf '%s  %s\n' "$(BASHDEPS_SHA256)" "$$path" | sha256sum -c - >/dev/null 2>&1; \
+		elif command -v shasum >/dev/null 2>&1; then \
+			[ "$$(shasum -a 256 "$$path" | awk '{print $$1}')" = "$(BASHDEPS_SHA256)" ]; \
+		else \
+			return 2; \
+		fi; \
+	}; \
+	if [ -f "$@" ] && verify_hash "$@"; then chmod 0755 "$@"; exit 0; fi; \
+	tmp="$@.tmp"; trap 'rm -f "$$tmp"' EXIT; \
+	if command -v curl >/dev/null 2>&1; then \
+		curl -fsSL "$(BASHDEPS_URL)" -o "$$tmp"; \
+	elif command -v wget >/dev/null 2>&1; then \
+		wget -qO "$$tmp" "$(BASHDEPS_URL)"; \
+	else \
+		printf '%s\n' 'curl or wget is required to bootstrap bashdeps.bash' >&2; exit 1; \
+	fi; \
+	verify_hash "$$tmp" || { printf '%s\n' 'Downloaded bashdeps.bash does not match the committed SHA-256 digest' >&2; exit 1; }; \
+	chmod 0755 "$$tmp"; mv "$$tmp" "$@"; trap - EXIT
+
+## Verify the pinned bashdeps bootstrap without network access or repair.
+verify-bashdeps:
+	@test -x "$(BASHDEPS)" || { printf '%s\n' 'Missing or non-executable vendor/bashdeps.bash; run make deps-docs' >&2; exit 1; }
+	@if command -v sha256sum >/dev/null 2>&1; then \
+		printf '%s  %s\n' "$(BASHDEPS_SHA256)" "$(BASHDEPS)" | sha256sum -c - >/dev/null 2>&1 || { printf '%s\n' 'bashdeps.bash digest mismatch; run make deps-docs' >&2; exit 1; }; \
+	elif command -v shasum >/dev/null 2>&1; then \
+		[ "$$(shasum -a 256 "$(BASHDEPS)" | awk '{print $$1}')" = "$(BASHDEPS_SHA256)" ] || { printf '%s\n' 'bashdeps.bash digest mismatch; run make deps-docs' >&2; exit 1; }; \
+	else \
+		printf '%s\n' 'No SHA-256 verification command is available for bashdeps.bash' >&2; exit 1; \
+	fi
+
+## Synchronize documentation-only dependencies; this target may use the network.
+deps-docs: $(BASHDEPS) $(DOCS_MANIFEST)
+	$(MAKE) --no-print-directory verify-bashdeps
+	"$(BASHDEPS)" sync "$(DOCS_MANIFEST)"
+
+## Verify prepared documentation dependencies without network access or repair.
+deps-docs-check: verify-bashdeps $(DOCS_MANIFEST)
+	"$(BASHDEPS)" verify "$(DOCS_MANIFEST)"
+
+## Generate stable reference documentation with bashdeps-pinned released filters.
+docs: deps-docs-check
+	$(MAKE) --no-print-directory docs-canary \
+		AWK_DOXYGEN_FILTER="$(VENDOR_AWK_FILTER)" \
+		BASH_DOXYGEN_FILTER="$(VENDOR_BASH_FILTER)"
+
+## Generate reference documentation with explicitly selected filter paths.
+##
+## This target is also the common integration-canary path.  It does not acquire
+## or repair dependencies; callers prepare the stable Bash filter separately and
+## may substitute current-source or exact-release AWK filter bytes.
+docs-canary:
+	@test -f "$(AWK_DOXYGEN_FILTER)" || { printf '%s\n' 'Missing AWK Doxygen filter' >&2; exit 1; }
+	@test -f "$(BASH_DOXYGEN_FILTER)" || { printf '%s\n' 'Missing Bash Doxygen filter' >&2; exit 1; }
+	chmod 0755 "$(AWK_DOXYGEN_FILTER)" "$(BASH_DOXYGEN_FILTER)"
+	"$(AWK_BIN)" -f "$(AWK_DOXYGEN_FILTER)" -- --strict --compact "$(SOURCE_FILTER)" >/dev/null
+	awk -f "$(BASH_DOXYGEN_FILTER)" -- --strict --compact ./tests/run-tests.sh >/dev/null
+	$(MAKE) --no-print-directory docs-clean
+	AWK_DOXYGEN_FILTER="$(abspath $(AWK_DOXYGEN_FILTER))" \
+	BASH_DOXYGEN_FILTER="$(abspath $(BASH_DOXYGEN_FILTER))" \
+		doxygen Doxyfile
+
+## Remove generated reference documentation.
+docs-clean:
+	rm -rf "$(REFERENCE_DOC_DIR)"
+
+clean: docs-clean
 	rm -rf "$(DIST_DIR)"
 
+## Remove all generated build, reference, and dependency state.
+distclean: clean
+	rm -rf "$(VENDOR_DIR)"
