@@ -58,8 +58,8 @@ to read, but whitespace itself does not create an AWK semantic boundary.
 
 ## Implemented scope
 
-The filter implements the governed function and global-state scope from ADRs 001
-through 003 and ADR-006:
+The filter implements the governed function, global-state, and action-bearing
+rule scope from ADRs 001 through 003, ADR-006, and ADR-007:
 
 - file-level `@file` documentation;
 - named AWK function headers whose complete parenthesized formal list appears on
@@ -75,12 +75,18 @@ through 003 and ADR-006:
 - rejection of a public `@param` after a documented `@local`;
 - standalone `@var` documentation for significant global variables and arrays;
 - validation that `@var` names are portable AWK identifiers;
+- documented `BEGIN` and `END` rules;
+- documented ordinary pattern/action rules whose opening action brace is on the
+  rule-header line;
+- documented action-only rules;
+- validation of tooling-safe `@rule` identities;
 - preservation of ordinary Doxygen directives such as `@brief`, `@details`,
   `@returns`, `@retval`, `@note`, `@warning`, and `@see`;
 - one authoritative synthesized function signature containing caller-visible
   parameters only;
 - Doxygen structural variable declarations using the generic `AwkValue`
-  pseudo-type; and
+  pseudo-type;
+- file-local synthetic Doxygen functions representing documented AWK rules; and
 - default line-preserving output plus compact output.
 
 Both of these portable function layouts are supported:
@@ -131,15 +137,59 @@ machine-readable metadata.
 
 A conventional omitted function formal remains `@local`, not `@var`.
 
-The documentation vocabulary also defines `@rule`, but rule constructs are not
-emitted by this implementation yet.  A documented `@rule` association therefore
-produces a diagnostic rather than speculative Doxygen structure.
+### Documented rules
 
-Formal lists split across physical lines remain outside the current parser
-boundary.  POSIX explicitly permits newlines before the opening function brace,
-but its function grammar does not make arbitrary newlines part of the formal
-list.  The filter therefore does not broaden its portable-AWK claim based on
-implementation-specific continuation behavior.
+AWK rules are not functions, so maintained source gives significant rules stable
+`@rule` documentation identities without pretending those identities exist in
+the AWK language:
+
+```awk
+## @rule initialize
+## @brief Initializes parsing state.
+## @par Trigger
+## Runs once during BEGIN processing before the first input record is read.
+BEGIN {
+    FS = ":"
+}
+```
+
+For Doxygen indexing, ADR-007 maps a supported rule to a generated file-local
+no-argument function.  The source `@rule` line is suppressed, while the synthetic
+declaration occupies the actual rule-header line:
+
+```cpp
+/// @brief Initializes parsing state.
+/// @par Trigger
+/// Runs once during BEGIN processing before the first input record is read.
+static void awk_doxygen_begin_initialize();
+```
+
+Generated prefixes distinguish `BEGIN`, `END`, and ordinary/action-only rules:
+
+```text
+awk_doxygen_begin_<identity>
+awk_doxygen_end_<identity>
+awk_doxygen_rule_<identity>
+```
+
+These names and the `static void` declarations are Doxygen-facing indexing
+artifacts only.  They do not describe callable AWK functions.
+
+The initial parser recognizes action-bearing rule headers whose opening action
+brace is the final token on the same physical line.  This includes `BEGIN`,
+`END`, ordinary pattern/action rules, and the action-only `{` form.  The filter
+does not parse or reproduce the pattern expression.
+
+Pattern-only rules remain valid AWK and remain documentable under the source
+standard, but the current filter does not synthesize Doxygen entities for them.
+Supporting arbitrary pattern-only association would require a broader recognition
+contract than the conservative action-brace anchor currently provides.
+
+Formal lists split across physical lines remain outside the current function
+parser boundary.  POSIX explicitly permits newlines before the opening function
+brace, but its function grammar does not make arbitrary newlines part of the
+formal list.  The filter therefore does not broaden its portable-AWK claim based
+on implementation-specific continuation behavior.
 
 ## Manual usage
 
@@ -165,7 +215,7 @@ This is useful in CI when documentation drift should fail validation.
 `--compact` suppresses blank placeholder lines.  Default mode emits a
 one-for-one line representation for valid translated source wherever practical,
 so generated declarations remain on the same line number as their AWK function
-headers or maintained `@var` directives.
+headers, maintained `@var` directives, or associated AWK rule headers.
 
 ## Doxyfile usage
 
@@ -180,8 +230,13 @@ RECURSIVE = YES
 FILTER_PATTERNS = *.awk=./doxygen-awk.awk
 EXTENSION_MAPPING = awk=C++
 EXTRACT_ALL = NO
+EXTRACT_STATIC = YES
 QUIET = YES
 ```
+
+`EXTRACT_STATIC = YES` is required for generated rule entities because ADR-007
+uses file-local `static` declarations so natural rule identities may recur in
+different AWK files without becoming one apparent global pseudo-function.
 
 When strict validation is required through Doxygen itself, use a small wrapper
 that supplies `--strict` to the filter.
@@ -199,9 +254,12 @@ including:
 - a caller-visible `@param` appearing after a documented `@local`;
 - a deferred function header that is not followed by an opening brace;
 - an empty or invalid `@var` identity;
-- a documentation block separated from its function declaration;
-- a documentation block not followed by a recognized function declaration; and
-- currently unsupported `@rule` associations.
+- an empty or invalid `@rule` identity;
+- a `@rule` block separated from its AWK rule header;
+- a `@rule` block not followed by a recognized action-bearing rule header,
+  including pattern-only rules in the current implementation;
+- a documentation block separated from its function declaration; and
+- a documentation block not followed by a recognized function declaration.
 
 Normal mode reports diagnostics while continuing translation.  Strict mode
 reports the same diagnostics and exits non-zero.
@@ -257,10 +315,12 @@ against the maintained source and generated consumer artifact.
 The suite covers file documentation, zero-parameter functions, caller-visible
 parameters, conventional locals, a conventional local array, portable next-line
 function braces, comment-separated opening braces, documented global variables
-and arrays, EOF global blocks, global/source non-association, descriptive Doxygen
-directives, ignored undocumented source, validation failures, default source-line
+and arrays, EOF global blocks, global/source non-association, documented `BEGIN`
+and `END` rules, ordinary action-bearing and action-only rules, invalid rule
+identities, unsupported pattern-only association, descriptive Doxygen directives,
+ignored undocumented source, validation failures, default source-line
 correspondence, compact output, and strict self-validation of the filter's own
-governed function documentation.
+governed documentation.
 
 The inherited Bash fixtures remain in the repository only as inactive historical
 scaffolding and are not referenced by the AWK regression harness.

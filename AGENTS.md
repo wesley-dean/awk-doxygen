@@ -44,8 +44,8 @@ future maintainer to infer them from executable code.
 
 The filter itself is maintained AWK source and should comply with the same
 standard.  Its regression suite includes strict self-validation of documented
-functions, so parser changes must keep source documentation and real AWK formals
-aligned.
+functions and rules, so parser changes must keep source documentation and real
+AWK structure aligned.
 
 ## Architecture and Scope
 
@@ -80,10 +80,22 @@ explicit metadata.
 
 A conventional omitted function formal remains `@local`, not `@var`.
 
-`@rule` belongs to the maintained documentation vocabulary, but its Doxygen
-representation is not implemented yet.  Do not infer `BEGIN`, `END`, or ordinary
-pattern/action rules opportunistically.  Expand those capabilities only under a
-governing ADR and focused regression fixtures.
+Significant AWK rules use stable source-side `@rule` identities under ADR-007.
+Supported action-bearing rule headers are translated to file-local synthetic
+Doxygen functions using generated prefixes that distinguish `BEGIN`, `END`, and
+ordinary/action-only rules.  The generated declarations are indexing artifacts,
+not callable AWK functions.
+
+The initial rule parser recognizes only action-bearing rules whose opening action
+brace is on the same physical line as the rule header.  It does not parse or
+reproduce arbitrary pattern expressions.  Pattern-only rules remain valid source
+and may be documented under the maintained standard, but the filter does not yet
+synthesize Doxygen entities for them.  Do not widen that boundary by treating any
+arbitrary source line following `@rule` as a recognized rule.
+
+Generated rule functions are `static` so the same natural source identity can be
+used independently in different AWK files.  Doxygen consumers therefore require
+`EXTRACT_STATIC = YES` for rule entities to appear.
 
 ## Portability
 
@@ -120,13 +132,19 @@ fixtures to implementation details merely to increase apparent coverage.
 The same semantic suite must exercise maintained source and the generated
 `dist/doxygen-awk.awk` artifact.  Preserve tests for strict/non-strict
 diagnostics, compact output, source-line correspondence, portable next-line
-function braces, standalone documented globals, and self-documentation when
-changing parser structure.
+function braces, standalone documented globals, documented action-bearing rules,
+and self-documentation when changing parser structure.
 
 Global-state tests must continue to protect ADR-006's inference boundary: scalar
 and array examples use the same generated pseudo-type, no following assignment
 is required, unrelated following source is not consumed as a declaration, and
 invalid `@var` identities are diagnosed.
+
+Rule tests must continue to protect ADR-007's semantic boundary: `BEGIN`, `END`,
+ordinary action-bearing, and action-only rules receive the correct file-local
+synthetic prefix; source `@rule` metadata is suppressed; invalid identities are
+diagnosed; pattern-only rules remain unsupported; and generated declarations stay
+on the source rule-header line in default mode.
 
 Run the suite with a selected interpreter using, for example:
 
