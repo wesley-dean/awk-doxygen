@@ -7,7 +7,7 @@ HTML_OUTPUT            = .
 GENERATE_LATEX         = NO
 GENERATE_MAN           = NO
 GENERATE_RTF           = NO
-GENERATE_XML           = NO
+GENERATE_XML            = NO
 INPUT                  = README.md \
                          AGENTS.md \
                          doxygen-awk.awk \
@@ -31,9 +31,9 @@ EXCLUDE_PATTERNS       = */dist/* \
 EXTENSION_MAPPING      = awk=C++ \
                          sh=C++ \
                          bash=C++
-FILTER_PATTERNS        = *.awk=vendor/doxygen-awk.awk \
-                         *.sh=vendor/doxygen-bash.awk \
-                         *.bash=vendor/doxygen-bash.awk
+FILTER_PATTERNS        = *.awk=$(AWK_DOXYGEN_FILTER) \
+                         *.sh=$(BASH_DOXYGEN_FILTER) \
+                         *.bash=$(BASH_DOXYGEN_FILTER)
 EXTRACT_ALL            = NO
 EXTRACT_PRIVATE        = NO
 EXTRACT_STATIC         = YES
