@@ -1,0 +1,67 @@
+# Architecture Decisions
+
+This document provides concise summaries of the architecture decisions governing
+`awk-doxygen`.  The ADRs themselves remain authoritative; these summaries are
+navigation aids rather than substitutes for the full decisions.
+
+## ADR-000: Capability scope and epistemic honesty
+
+The project prioritizes accuracy, explicit capability boundaries, evidence,
+separation of concerns, and resistance to over-commitment or performative
+agreement.  Claims about supported syntax, portability, validation, or generated
+behavior must therefore match what the implementation and tests actually prove.
+Inherited scaffolding, planned behavior, and implemented behavior must remain
+clearly distinguished.  See
+[`ADR-000`](adr/ADR-000-capability-scope-and-epistemic-honesty.md).
+
+## ADR-001: Define the supported AWK documentation scope
+
+`awk-doxygen` is a documentation compiler for an intentionally small, governed
+subset of AWK rather than a complete language parser.  The first implementation
+focuses on file documentation and named functions, while `@var` and `@rule`
+provide vocabulary for significant globals and rule constructs that may be
+implemented later under explicit contracts.  The filter prefers explicit author
+intent and conservative recognition over speculative inference, and portable AWK
+is the default implementation floor.  See
+[`ADR-001`](adr/ADR-001-define-supported-awk-documentation-scope.md).
+
+## ADR-002: Distinguish caller parameters from conventional AWK locals
+
+Portable AWK commonly uses omitted formal parameters as function-local storage,
+but whitespace does not make those formals semantically local.  `@param`
+therefore identifies caller-visible parameters, while `@local` explicitly marks
+formals normal callers omit for local storage.  The filter validates both against
+the real AWK declaration and excludes `@local` formals from generated public
+signatures.  See
+[`ADR-002`](adr/ADR-002-distinguish-caller-parameters-from-conventional-locals.md).
+
+## ADR-003: Use synthesized declarations as authoritative Doxygen signatures
+
+For each recognized AWK function, the generated pseudo-C++ declaration is the
+single authoritative signature presented to Doxygen.  Source `@fn` metadata is
+retained for validation but suppressed from generated output so it cannot
+compete with the synthesized signature.  Only caller-visible `@param` formals
+appear in that declaration; conventional `@local` formals remain implementation
+documentation rather than public arguments.  See
+[`ADR-003`](adr/ADR-003-use-synthesized-declarations-as-authoritative-doxygen-signatures.md).
+
+## ADR-004: Build and release a versioned doxygen-awk artifact
+
+The maintained and released filter is named `doxygen-awk.awk`.  Release builds
+will create `dist/doxygen-awk.awk`, add version/build/commit provenance as
+comments, and publish a standard `doxygen-awk.awk.sha256` checksum without adding
+runtime metadata state.  Automatic releases remain disabled until the AWK
+implementation, AWK regression suite, generated artifact, checksum, and release
+workflow all describe the same verified consumer contract.  See
+[`ADR-004`](adr/ADR-004-build-and-release-a-versioned-doxygen-awk-artifact.md).
+
+## ADR-005: Use small behavior-focused regression fixtures
+
+Regression tests are organized around small source fixtures and golden generated
+output so each failure identifies a narrow public contract.  Diagnostics are
+tested independently where useful, and the same semantic suite will exercise
+both maintained source and generated release bytes.  Portable-AWK claims should
+be supported by more than one AWK implementation where practical, and inherited
+Bash fixtures are transitional scaffolding rather than evidence of AWK support.
+See
+[`ADR-005`](adr/ADR-005-use-small-behavior-focused-regression-fixtures.md).
