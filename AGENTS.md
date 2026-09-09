@@ -57,9 +57,9 @@ not provide enough information to make a structural claim reliably, require
 explicit documentation metadata or leave the construct undocumented rather than
 inventing semantics.
 
-The implemented baseline is centered on file blocks and named AWK function
-headers whose complete parenthesized formal list appears on one physical line.
-The opening brace may appear on that same line or after newline/comment-only
+The implemented function baseline is centered on named AWK function headers
+whose complete parenthesized formal list appears on one physical line.  The
+opening brace may appear on that same line or after newline/comment-only
 separator lines.  Public parameters and conventional omitted-formal locals are
 distinct concepts: `@param` documents caller-supplied formals and `@local`
 documents formals used as local storage by convention.  Every declared formal in
@@ -70,10 +70,20 @@ boundary.  Do not broaden that boundary merely because one supported AWK
 implementation accepts a continuation form that POSIX does not specify in the
 function grammar.
 
-`@var` and `@rule` belong to the maintained documentation vocabulary, but their
-Doxygen representation is not implemented yet.  Do not infer globals, arrays,
-`BEGIN`, `END`, or ordinary pattern/action rules opportunistically.  Expand
-those capabilities only under governing ADRs and focused regression fixtures.
+Significant global variables and arrays are documented with standalone `@var`
+blocks under ADR-006.  The `@var` block itself is authoritative: do not require,
+scan for, or infer a following assignment, initializer, first use, or declaration
+anchor.  Generated output uses the generic `AwkValue` pseudo-type for both
+scalar-like and array-like globals.  Shape, lifecycle, ownership, mutability, and
+initialization semantics remain maintained prose unless later governance adds
+explicit metadata.
+
+A conventional omitted function formal remains `@local`, not `@var`.
+
+`@rule` belongs to the maintained documentation vocabulary, but its Doxygen
+representation is not implemented yet.  Do not infer `BEGIN`, `END`, or ordinary
+pattern/action rules opportunistically.  Expand those capabilities only under a
+governing ADR and focused regression fixtures.
 
 ## Portability
 
@@ -110,7 +120,13 @@ fixtures to implementation details merely to increase apparent coverage.
 The same semantic suite must exercise maintained source and the generated
 `dist/doxygen-awk.awk` artifact.  Preserve tests for strict/non-strict
 diagnostics, compact output, source-line correspondence, portable next-line
-function braces, and self-documentation when changing parser structure.
+function braces, standalone documented globals, and self-documentation when
+changing parser structure.
+
+Global-state tests must continue to protect ADR-006's inference boundary: scalar
+and array examples use the same generated pseudo-type, no following assignment
+is required, unrelated following source is not consumed as a declaration, and
+invalid `@var` identities are diagnosed.
 
 Run the suite with a selected interpreter using, for example:
 
