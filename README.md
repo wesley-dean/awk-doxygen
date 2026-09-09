@@ -1,188 +1,248 @@
-# bash-doxygen
+# awk-doxygen
 
-`bash-doxygen` is a documentation-led Doxygen filter for Bash.  It converts
-Doxygen-style Bash comments and the Bash declaration that follows them into a
-small pseudo-C++ representation that Doxygen can index.
+`awk-doxygen` is a documentation-led Doxygen filter for AWK.  It converts
+intentionally documented AWK constructs into a small Doxygen-friendly
+pseudo-C++ representation without pretending that AWK is C++ or that the
+filter is a complete AWK parser.
 
-The filter is intentionally conservative about what it documents: a function or
-variable is only emitted when it is decorated with a Doxygen comment block.
-Undocumented helper functions and implementation details are ignored.
+The project was derived from
+[`bash-doxygen`](https://github.com/wesley-dean/bash-doxygen), which provided the
+architectural model for documentation buffering, conservative source
+recognition, diagnostics, small regression fixtures, generated release
+artifacts, and Doxygen-facing intermediate output.  `awk-doxygen` is an
+independently governed project whose language contracts, ADRs, tests, releases,
+and implementation may diverge wherever AWK semantics require it.
 
-The implementation lives in a single portable awk file:
+## Documentation standard
+
+The normative, reusable AWK source-documentation standard is:
 
 ```text
-./doxygen-bash.awk
+doc/documentation-standard.md
 ```
 
-## Comment style
+The standard preserves the verbose, intent-oriented documentation philosophy
+used by related Bash projects while defining AWK-native contracts for function
+return values, caller parameters, conventional local formals, global state,
+record processing, `BEGIN`/`END` blocks, and pattern/action rules.
 
-The primary supported style is a contiguous block of `##` comments immediately
-before the declaration being documented:
+The maintained comment dialect uses contiguous `##` lines:
 
-```bash
-## @brief Read a file from disk.
+```awk
+## @fn normalize(value)
+## @brief Normalizes a supplied value.
 ## @details
-## The caller is responsible for validating the path before calling this
-## function.
-## @param path File path to read.
-## @returns 0 on success; non-zero otherwise.
-read_file() {
-    cat -- "$1"
+## Converts the value into the canonical representation expected by callers.
+##
+## @param value Value to normalize.
+## @local result Scratch value used while normalizing.
+##
+## @par STDIN
+## Nothing is read directly from STDIN.
+## @par STDOUT
+## Nothing is written to STDOUT.
+## @par STDERR
+## Nothing is written to STDERR.
+##
+## @returns The normalized value.
+function normalize(value,    result) {
+    result = value
+    return result
 }
 ```
 
-For variables, use `@var` when you want the filter to validate that the comment
-matches the declaration:
+`@param` identifies caller-supplied formal parameters.  `@local` identifies
+formal parameters that normal callers intentionally omit so they can serve as
+portable AWK function-local storage.  Whitespace may make that convention easier
+to read, but whitespace itself does not create an AWK semantic boundary.
 
-```bash
-## @var CACHE_DIR
-## @brief Directory used for cached data.
-readonly CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/example"
+## Implemented scope
+
+The filter implements the governed function-focused scope from ADRs 001 through
+003:
+
+- file-level `@file` documentation;
+- named AWK function headers whose complete parenthesized formal list appears on
+  one physical line;
+- an opening function brace on the header line or on a later line after only
+  newline/comment-only separators;
+- zero or more caller-visible `@param` formals;
+- zero or more conventional `@local` formals;
+- validation of `@fn` names against actual AWK function names;
+- validation that every declared formal is documented exactly once as
+  `@param` or `@local`;
+- declaration-order validation for documented formals;
+- rejection of a public `@param` after a documented `@local`;
+- preservation of ordinary Doxygen directives such as `@brief`, `@details`,
+  `@returns`, `@retval`, `@note`, `@warning`, and `@see`;
+- one authoritative synthesized function signature containing caller-visible
+  parameters only; and
+- default line-preserving output plus compact output.
+
+Both of these portable declaration layouts are supported:
+
+```awk
+function normalize(value,    result) {
 ```
 
-The filter preserves normal Doxygen commands such as `@brief`, `@details`,
-`@param`, `@returns`, `@retval`, `@note`, `@warning`, `@see`, and custom aliases.
-It only interprets a small structural subset: `@file`, `@fn`, `@var`, and
-`@param` names.
+```awk
+function normalize(value,    result)
+{
+```
+
+Blank lines or comment-only lines may appear between the function header and the
+opening brace.  In default mode they remain blank placeholders in generated
+output, while the synthesized Doxygen declaration stays on the original function
+header line.
+
+The generated pseudo-type `AwkValue` is deliberately synthetic.  It gives
+Doxygen a stable shape to index and is not a claim that AWK has static types.
+
+The documentation vocabulary also defines `@var` and `@rule`, but those
+constructs are not emitted by this implementation yet.  A documented `@var` or
+`@rule` association therefore produces a diagnostic rather than speculative
+Doxygen structure.
+
+Formal lists split across physical lines remain outside the current parser
+boundary.  POSIX explicitly permits newlines before the opening function brace,
+but its function grammar does not make arbitrary newlines part of the formal
+list.  The filter therefore does not broaden its portable-AWK claim based on
+implementation-specific continuation behavior.
 
 ## Manual usage
 
-Run the filter directly with awk:
+Run the maintained filter directly with AWK:
 
 ```sh
-awk -f ./doxygen-bash.awk ./script.bash > ./script.dox.cpp
+awk -f ./doxygen-awk.awk ./program.awk > ./program.dox.cpp
 ```
 
-The generated file is not intended to be compiled.  It is a Doxygen-friendly
-intermediate representation.
+The generated file is an indexing representation for Doxygen.  It is not
+intended to be compiled or executed.
 
-You can also make the filter executable:
+The filter accepts two command-line options before source file names:
 
 ```sh
-chmod +x ./doxygen-bash.awk
-./doxygen-bash.awk ./script.bash > ./script.dox.cpp
+awk -f ./doxygen-awk.awk -- --strict ./program.awk
+awk -f ./doxygen-awk.awk -- --compact ./program.awk
 ```
 
-### Options
+`--strict` exits non-zero when the filter emits a documentation diagnostic.
+This is useful in CI when documentation drift should fail validation.
 
-The filter accepts simple command-line options before file names:
-
-```sh
-awk -f ./doxygen-bash.awk -- --strict ./script.bash > ./script.dox.cpp
-awk -f ./doxygen-bash.awk -- --compact ./script.bash > ./script.dox.cpp
-```
-
-`--strict` exits with a non-zero status when the filter emits a diagnostic.
-This is useful in CI when documentation drift should fail the build.
-
-`--compact` suppresses blank placeholder lines in the generated output.  By
-default, blank lines are emitted for ignored source lines so Doxygen diagnostics
-remain closer to the original Bash source locations.
+`--compact` suppresses blank placeholder lines.  Default mode emits a
+one-for-one line representation for valid translated source wherever practical,
+so generated declarations remain on the same line number as their AWK
+function headers.
 
 ## Doxyfile usage
 
-Use the filter with Doxygen by adding it to `FILTER_PATTERNS`:
+Associate `.awk` files with the filter and map the generated representation to
+C++ for Doxygen indexing:
 
 ```ini
-FILTER_PATTERNS = *.sh=./doxygen-bash.awk \
-                  *.bash=./doxygen-bash.awk
-```
-
-A minimal configuration might look like this:
-
-```ini
-PROJECT_NAME = "Bash Project"
+PROJECT_NAME = "AWK Project"
 INPUT = .
-FILE_PATTERNS = *.sh *.bash
+FILE_PATTERNS = *.awk
 RECURSIVE = YES
-FILTER_PATTERNS = *.sh=./doxygen-bash.awk \
-                  *.bash=./doxygen-bash.awk
-EXTENSION_MAPPING = sh=C++ bash=C++
+FILTER_PATTERNS = *.awk=./doxygen-awk.awk
+EXTENSION_MAPPING = awk=C++
 EXTRACT_ALL = NO
 QUIET = YES
 ```
 
-When using strict mode through Doxygen, wrap the filter in a small script:
-
-```sh
-#!/bin/sh
-awk -f ./doxygen-bash.awk -- --strict "$@"
-```
-
-Then reference that wrapper from `FILTER_PATTERNS`.
-
-## Supported declarations
-
-The filter recognizes documented functions using common Bash forms:
-
-```bash
-name() {
-name () {
-function name {
-function name() {
-```
-
-It recognizes documented variables using common assignment and declaration
-forms:
-
-```bash
-NAME=value
-NAME=(one two three)
-readonly NAME=value
-export NAME=value
-local NAME=value
-declare -r NAME=value
-declare -a NAME=(one two three)
-declare -A NAME=([key]=value)
-declare -i COUNT=0
-declare -n REF=NAME
-declare -l LOWER=value
-declare -u UPPER=value
-```
-
-Variable output is enriched with inferred Bash characteristics, including
-read-only/read-write, exported, local, indexed array, associative array,
-integer, nameref, lowercase transform, and uppercase transform.
+When strict validation is required through Doxygen itself, use a small wrapper
+that supplies `--strict` to the filter.
 
 ## Diagnostics
 
-Diagnostics are written to standard error.  The filter warns when:
+Diagnostics are written to standard error.  Current validation detects cases
+including:
 
-- a documentation block is not followed by a recognized declaration;
-- an `@fn` block precedes a variable declaration;
-- an `@var` block precedes a function declaration;
-- an `@fn` name differs from the function declaration;
-- an `@var` name differs from the variable declaration.
+- an `@fn` name that differs from the following function declaration;
+- a documented formal that does not exist in the declaration;
+- a declared formal that is not classified as `@param` or `@local`;
+- duplicate formal documentation;
+- documentation order that differs from declaration order;
+- a caller-visible `@param` appearing after a documented `@local`;
+- a deferred function header that is not followed by an opening brace;
+- a documentation block separated from its function declaration;
+- a documentation block not followed by a recognized function declaration; and
+- currently unsupported `@var` or `@rule` associations.
 
-With `--strict`, any warning causes the filter to exit non-zero.
+Normal mode reports diagnostics while continuing translation.  Strict mode
+reports the same diagnostics and exits non-zero.
+
+## Build and release artifact
+
+The maintained filter is:
+
+```text
+doxygen-awk.awk
+```
+
+`make build` generates the consumer artifact:
+
+```text
+dist/doxygen-awk.awk
+```
+
+The generated file preserves the AWK shebang and records version, build date,
+and source commit provenance as comments so build metadata cannot change AWK
+runtime behavior.
+
+`make checksums` produces:
+
+```text
+dist/doxygen-awk.awk.sha256
+```
+
+Automatic release publication remains disabled during active development.  The
+workflow and artifact naming are nevertheless kept aligned with the governed
+AWK release contract so release publication can be enabled deliberately rather
+than repaired during a release.
 
 ## Testing
 
-Run the complete test suite from the repository root:
+Run the complete regression suite from the repository root:
 
 ```sh
 make test
 ```
 
-The suite uses small, behavior-focused fixtures.  Successful translations in
-`tests/fixtures/` are compared with golden pseudo-C++ output in `tests/expected/`.
-Diagnostic cases in `tests/diagnostics/` verify both normal warning behavior and
-strict-mode failure.  The suite also covers compact/default blank-line behavior
-and runs against both the maintained source and the generated distribution
-artifact.
-
-To exercise the maintained source directly without building `dist/`, run:
+Select a particular AWK implementation with `AWK_BIN`:
 
 ```sh
-./tests/run-tests.sh
+make test AWK_BIN=mawk
+make test AWK_BIN=gawk
 ```
 
-## Design notes
+CI exercises both `mawk` and GNU awk.  The active AWK suite uses small
+behavior-focused fixtures under `tests/awk/` and runs the same semantic cases
+against the maintained source and generated consumer artifact.
 
-This project is not a full Bash parser.  It is a documentation compiler for the
-small subset of Bash declarations that can reasonably follow a Doxygen block.
-The parser is permissive about whitespace and declaration style, but strict
-about documented intent when `@fn` or `@var` is provided.
+The suite covers file documentation, zero-parameter functions, caller-visible
+parameters, conventional locals, a conventional local array, portable next-line
+function braces, comment-separated opening braces, descriptive Doxygen
+directives, ignored undocumented source, validation failures, default source-line
+correspondence, compact output, and strict self-validation of the filter's own
+governed function documentation.
+
+The inherited Bash fixtures remain in the repository only as inactive historical
+scaffolding and are not referenced by the AWK regression harness.
+
+## Governance
+
+Repository work is governed by:
+
+- `AGENTS.md`;
+- `doc/documentation-standard.md`;
+- ADRs in `doc/adr/`; and
+- concise ADR summaries in `doc/decisions.md`.
+
+Accepted ADRs are project governance.  Consequential changes to source
+recognition, interfaces, portability, release behavior, or compatibility should
+be captured in an ADR unless an existing decision already governs them.
 
 ## License
 
@@ -191,5 +251,6 @@ License.  See [LICENSE](LICENSE) for details.
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and
-[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+Contributions are welcome.  Read [CONTRIBUTING.md](CONTRIBUTING.md),
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [AGENTS.md](AGENTS.md) before
+proposing changes.
