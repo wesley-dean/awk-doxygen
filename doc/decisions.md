@@ -77,3 +77,16 @@ and mutability in maintained prose.  `@var` names must be valid portable AWK
 identifiers, and conventional function-local formals remain governed by
 `@local`.  See
 [`ADR-006`](adr/ADR-006-treat-var-as-authoritative-global-documentation.md).
+
+## ADR-007: Represent AWK rules as file-local synthetic functions
+
+Maintained source uses `@rule` to name significant `BEGIN`, `END`, and ordinary
+AWK rules without pretending those constructs are source-level functions.  The
+filter represents supported action-bearing rules to Doxygen as file-local
+`static void` synthetic functions, using distinct generated prefixes for
+`BEGIN`, `END`, and ordinary/action-only rules while preserving the declaration
+on the original rule-header line.  The first implementation deliberately leaves
+pattern-only rules outside the recognition boundary and requires consumers to
+set `EXTRACT_STATIC = YES` so generated rule entities appear in Doxygen output.
+See
+[`ADR-007`](adr/ADR-007-represent-awk-rules-as-file-local-synthetic-functions.md).
