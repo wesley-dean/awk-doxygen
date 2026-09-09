@@ -2,16 +2,29 @@
 ## @file doxygen-awk.awk
 ## @brief Converts documented AWK constructs into Doxygen-friendly declarations.
 ## @details
-## Implements the documentation-led subset governed by ADRs 001 through 003 and
-## ADR-006.  The filter recognizes file blocks, portable named AWK function
-## declarations, and explicitly documented global variables or arrays.  It
-## validates @fn, @param, @local, and @var metadata and emits line-based Doxygen
-## comments plus synthetic AwkValue declarations.  A function opening brace may
-## appear on the declaration line or after newline/comment-only lines.  Formal
-## lists themselves remain single-line.  The filter does not implement @rule
-## yet.  The implementation uses portable AWK language features; diagnostics are
-## written to /dev/stderr on Unix-like hosts.
+## Implements the documentation-led subset governed by ADRs 001 through 003,
+## ADR-006, and ADR-007.  The filter recognizes file blocks, portable named AWK
+## function declarations, explicitly documented global variables or arrays, and
+## documented action-bearing AWK rules.  It validates @fn, @param, @local, @var,
+## and @rule metadata and emits line-based Doxygen comments plus synthetic
+## declarations.  Function opening braces may follow newline/comment-only lines;
+## rule opening braces remain on the rule-header line.  Pattern-only rules are
+## outside the current recognition boundary.  The implementation uses portable
+## AWK language features; diagnostics are written to /dev/stderr on Unix-like
+## hosts.
 
+## @rule initialize_filter
+## @brief Initializes filter options and documentation-buffer state.
+## @details
+## Resolves strict and compact command-line flags before source records are
+## translated and establishes the initial empty documentation state.
+##
+## @par STDIN
+## Nothing is read directly from STDIN by this rule.
+## @par STDOUT
+## Nothing is written to STDOUT.
+## @par STDERR
+## Nothing is written to STDERR.
 BEGIN {
     strict = (strict ? strict : 0)
     keep_blanks = (compact ? 0 : 1)
@@ -289,7 +302,7 @@ function strip_doc_marker(line,    value) {
 ## structural directive with no identity resolves to the empty string.
 ##
 ## @param meta Trimmed documentation line.
-## @param directive Structural directive such as `@fn` or `@var`.
+## @param directive Structural directive such as `@fn`, `@var`, or `@rule`.
 ## @local value Mutable text used while extracting the symbol.
 ##
 ## @par STDIN
@@ -331,6 +344,29 @@ function is_valid_identifier(name) {
     return (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/)
 }
 
+## @fn is_valid_rule_identity(name)
+## @brief Determines whether an @rule identity maps safely to generated C++.
+## @details
+## Applies ADR-007's tooling-safe lexical form.  The accepted spelling matches
+## portable AWK identifiers for lossless translation, but a rule identity remains
+## documentation metadata rather than an AWK source identifier.
+##
+## @param name Candidate rule identity.
+##
+## @par STDIN
+## Nothing is read directly from STDIN.
+## @par STDOUT
+## Nothing is written to STDOUT.
+## @par STDERR
+## Nothing is written to STDERR.
+##
+## @returns A numeric truth value.
+## @retval 1 The identity can be embedded in a generated C++ identifier.
+## @retval 0 The identity is empty or contains unsupported characters.
+function is_valid_rule_identity(name) {
+    return (name ~ /^[A-Za-z_][A-Za-z0-9_]*$/)
+}
+
 ## @fn parse_formal_name(meta, directive)
 ## @brief Extracts a formal name from an `@param` or `@local` line.
 ## @details
@@ -360,9 +396,8 @@ function parse_formal_name(meta, directive,    value) {
 ## @fn add_doc_line(line)
 ## @brief Buffers one documentation line and records structural metadata.
 ## @details
-## Recognizes `@file`, `@fn`, `@param`, `@local`, and `@var` for implemented
-## behavior.  `@rule` is recognized only so unsupported associations can be
-## diagnosed rather than emitted as false Doxygen structure.
+## Recognizes `@file`, `@fn`, `@param`, `@local`, `@var`, and `@rule` for
+## implemented behavior.
 ##
 ## @param line Documentation source line.
 ## @local content Documentation content without the `##` marker.
@@ -391,7 +426,7 @@ function add_doc_line(line,    content, meta) {
     } else if (meta ~ /^@var([ \t]|$)/) {
         doc_kind = "var"
         doc_name = parse_doc_symbol(meta, "@var")
-    } else if (meta ~ /^@rule[ \t]+/) {
+    } else if (meta ~ /^@rule([ \t]|$)/) {
         doc_kind = "rule"
         doc_name = parse_doc_symbol(meta, "@rule")
     } else if (meta ~ /^@param[ \t]+/) {
@@ -493,6 +528,65 @@ function parse_function_decl(line, info,    source, name, open_pos, close_pos, p
     return 1
 }
 
+## @fn parse_rule_header(line, info)
+## @brief Recognizes the governed action-bearing AWK rule-header forms.
+## @details
+## Classifies BEGIN, END, ordinary pattern/action, and action-only rules without
+## parsing the pattern expression.  The opening action brace must be the final
+## non-whitespace token on the physical header line.  Pattern-only rules remain
+## outside the ADR-007 implementation boundary.
+##
+## @param line Source line that may contain an AWK rule header.
+## @param info Array populated with the recognized rule kind.
+## @local source Trimmed copy of the source line.
+##
+## @par STDIN
+## Nothing is read directly from STDIN.
+## @par STDOUT
+## Nothing is written to STDOUT.
+## @par STDERR
+## Nothing is written to STDERR.
+##
+## @returns A numeric truth value.
+## @retval 1 The line is a recognized action-bearing rule header.
+## @retval 0 The line is outside the governed rule-header forms.
+function parse_rule_header(line, info,    source) {
+    clear_array(info)
+    source = trim(line)
+
+    if (source ~ /^function[ \t]+/) {
+        return 0
+    }
+
+    if (source ~ /^BEGIN([ \t]|$)/) {
+        if (source ~ /^BEGIN[ \t]*[{][ \t]*$/) {
+            info["kind"] = "begin"
+            return 1
+        }
+        return 0
+    }
+
+    if (source ~ /^END([ \t]|$)/) {
+        if (source ~ /^END[ \t]*[{][ \t]*$/) {
+            info["kind"] = "end"
+            return 1
+        }
+        return 0
+    }
+
+    if (source == "{") {
+        info["kind"] = "rule"
+        return 1
+    }
+
+    if (source ~ /[{][ \t]*$/) {
+        info["kind"] = "rule"
+        return 1
+    }
+
+    return 0
+}
+
 ## @fn docs_are_file_only()
 ## @brief Determines whether the current buffer is a standalone file block.
 ## @details
@@ -537,9 +631,9 @@ function docs_are_var_only() {
 ## @brief Emits buffered documentation as line-oriented Doxygen comments.
 ## @details
 ## Preserves one output line per source documentation line in default mode.
-## Source `@fn` and `@local` directives are structural metadata and are
-## suppressed from Doxygen; blank placeholders preserve their line positions
-## when compact mode is disabled.
+## Source `@fn`, `@local`, and `@rule` directives are structural metadata and
+## are suppressed from Doxygen where the generated declaration is authoritative;
+## blank placeholders preserve their line positions when compact mode is off.
 ##
 ## @param suppress_structural Whether source-only directives are suppressed.
 ## @local idx Current documentation-line index.
@@ -616,6 +710,73 @@ function emit_var_docs(    idx, line, meta, valid) {
         } else {
             print "/// " line
         }
+    }
+}
+
+## @fn build_rule_symbol(info, identity)
+## @brief Builds the generated file-local symbol for a documented AWK rule.
+## @details
+## Uses ADR-007's distinct BEGIN, END, and ordinary-rule prefixes.  The returned
+## name is generated pseudo-C++ vocabulary and is not an AWK source identifier.
+##
+## @param info Parsed rule metadata from `parse_rule_header()`.
+## @param identity Maintained `@rule` documentation identity.
+##
+## @par STDIN
+## Nothing is read directly from STDIN.
+## @par STDOUT
+## Nothing is written to STDOUT.
+## @par STDERR
+## Nothing is written to STDERR.
+##
+## @returns The synthetic C++ identifier used for Doxygen indexing.
+function build_rule_symbol(info, identity) {
+    if (info["kind"] == "begin") {
+        return "awk_doxygen_begin_" identity
+    }
+    if (info["kind"] == "end") {
+        return "awk_doxygen_end_" identity
+    }
+    return "awk_doxygen_rule_" identity
+}
+
+## @fn emit_rule(info)
+## @brief Emits one documented AWK rule as a file-local synthetic function.
+## @details
+## Suppresses source `@rule` metadata and emits the ADR-007 `static void`
+## declaration on the real AWK rule-header line.  Invalid identities are
+## diagnosed and replaced by an inline Doxygen warning so line correspondence
+## remains intact.
+##
+## @param info Parsed rule metadata from `parse_rule_header()`.
+## @local valid Numeric flag indicating whether the rule identity is valid.
+## @local symbol Generated file-local pseudo-C++ function name.
+##
+## @par STDIN
+## Nothing is read directly from STDIN.
+## @par STDOUT
+## Writes translated rule documentation and one synthetic declaration.
+## @par STDERR
+## Writes a diagnostic when the documented rule identity is invalid.
+##
+## @returns No meaningful value; callers use the function for output.
+function emit_rule(info,    valid, symbol) {
+    valid = is_valid_rule_identity(doc_name)
+    if (!valid) {
+        if (doc_name == "") {
+            fail_or_warn("invalid @rule identity")
+        } else {
+            fail_or_warn("invalid @rule identity " doc_name)
+        }
+    }
+
+    emit_doc_lines(1)
+
+    if (valid) {
+        symbol = build_rule_symbol(info, doc_name)
+        print "static void " symbol "();"
+    } else {
+        print "/// @warning Invalid @rule declaration was not emitted."
     }
 }
 
@@ -882,6 +1043,19 @@ function flush_unmatched_docs(reason) {
     }
 }
 
+## @rule translate_source_record
+## @brief Translates one AWK source record into the Doxygen-facing stream.
+## @details
+## Owns the top-level documentation association state machine.  It resolves
+## pending function braces, standalone file/global blocks, documented functions,
+## and supported documented rules while leaving ordinary source as blank output.
+##
+## @par STDIN
+## Processes the current AWK source record supplied by the AWK execution engine.
+## @par STDOUT
+## Writes translated documentation, declarations, or blank placeholders.
+## @par STDERR
+## Writes diagnostics through helper functions when documentation drifts.
 {
     source_line = $0
 
@@ -923,7 +1097,11 @@ function flush_unmatched_docs(reason) {
                 emit_blank()
                 next
             }
-            flush_unmatched_docs("documentation block was separated from its function declaration")
+            if (doc_kind == "rule") {
+                flush_unmatched_docs("documentation block was separated from its AWK rule header")
+            } else {
+                flush_unmatched_docs("documentation block was separated from its function declaration")
+            }
             emit_blank()
             next
         }
@@ -949,6 +1127,17 @@ function flush_unmatched_docs(reason) {
                 }
                 next
             }
+        } else if (doc_kind == "rule") {
+            if (parse_rule_header(source_line, rule_info)) {
+                emit_rule(rule_info)
+                clear_array(rule_info)
+                reset_doc()
+                next
+            }
+
+            flush_unmatched_docs("documentation block was not followed by a recognized action-bearing AWK rule header")
+            emit_blank()
+            next
         } else {
             flush_unmatched_docs("@" doc_kind " documentation is not supported by this implementation")
             emit_blank()
@@ -961,6 +1150,18 @@ function flush_unmatched_docs(reason) {
     emit_blank()
 }
 
+## @rule finalize_filter
+## @brief Flushes pending documentation and resolves strict-mode status.
+## @details
+## Handles incomplete deferred functions and documentation buffered at end of
+## input, then exits non-zero when strict mode observed documentation warnings.
+##
+## @par STDIN
+## Nothing is read directly from STDIN by this rule.
+## @par STDOUT
+## May write final buffered documentation and blank placeholders.
+## @par STDERR
+## May write final diagnostics through helper functions.
 END {
     if (pending_function) {
         flush_unmatched_docs("function declaration " function_info["name"] " reached end of file before an opening brace")
@@ -974,7 +1175,11 @@ END {
 
     if (doc_count > 0) {
         if (!flush_file_docs() && !flush_var_docs()) {
-            flush_unmatched_docs("documentation block reached end of file without a recognized AWK construct")
+            if (doc_kind == "rule") {
+                flush_unmatched_docs("@rule documentation reached end of file without a recognized action-bearing AWK rule header")
+            } else {
+                flush_unmatched_docs("documentation block reached end of file without a recognized AWK construct")
+            }
         }
     }
 
