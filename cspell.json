@@ -1,0 +1,30 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "ADR",
+    "ADRs",
+    "Certbot",
+    "certbot",
+    "CPEs",
+    "devskim",
+    "dustilock",
+    "kiprox",
+    "letsencrypt",
+    "lockfiles",
+    "Makefiles",
+    "Mikrotik",
+    "privkey",
+    "Pryce",
+    "resx",
+    "RouterOS",
+    "SARIF",
+    "shfmt",
+    "spacesPerIndentLevel",
+    "SSTP",
+    "trufflehogignore",
+    "vsct",
+    "vsixmanifest",
+    "wesleydean"
+  ]
+}
