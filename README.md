@@ -248,8 +248,9 @@ dogfoods both `awk-doxygen` and `bash-doxygen` while doing so.
 
 Stable documentation dependencies are declared separately from the ordinary build
 in `dependencies-docs.txt`.  A pinned `bashdeps` release materializes the pinned
-filter artifacts beneath `vendor/`.  The current stable pins are `awk-doxygen`
-v0.0.3 and `bash-doxygen` v0.0.14.
+filter artifacts and ADR navigation tooling beneath `vendor/`.  The current
+stable pins are `awk-doxygen` v0.0.3, `bash-doxygen` v0.0.14, and `adrctl`
+v0.0.13.
 
 Prepare the documentation dependencies with:
 
@@ -263,28 +264,43 @@ Verify them without network access or repair with:
 make deps-docs-check
 ```
 
+Generate the ephemeral linked ADR landing page from already-prepared dependency
+state with:
+
+```sh
+make adr-index
+```
+
 Generate the stable reference tree with:
 
 ```sh
 make docs
 ```
 
-The generated HTML lives under `doc/reference/`, is ignored by Git, and is
-published to GitHub Pages by CI rather than committed to the repository.
+The generated ADR landing page lives at `doc/adr/README.md`; the generated HTML
+lives under `doc/reference/`.  Both are ignored by Git and are regenerated from
+maintained source and pinned documentation tooling rather than committed.
 `make docs` consumes already-prepared dependency state; it does not synchronize
 or repair dependencies itself.
 
 Stable Pages generation intentionally uses the released, SHA-256-pinned
 `vendor/doxygen-awk.awk`, not the repository-local filter.  This exercises the
-same consumer boundary downstream projects use.
+same consumer boundary downstream projects use.  The same shared documentation
+path generates the ADR landing page before Doxygen for stable publication and
+both ADR-009 canaries, so those paths validate the same site structure.
 
-ADR-009 adds two complementary canaries without moving that stable pin.  Pull
-requests and `main` generate the same reference corpus with current repository
-`doxygen-awk.awk`, providing pre-release integration feedback.  When a release is
-published, a second canary downloads the exact released `doxygen-awk.awk` asset
-and checksum, verifies the bytes, and generates the same reference documentation.
-This catches both source-level regressions before release and packaging failures
-after release while leaving stable Pages publication reproducible.
+ADR-009 adds two complementary canaries without moving the stable filter pins.
+Pull requests and `main` generate the same reference corpus with current
+repository `doxygen-awk.awk`, providing pre-release integration feedback.  When a
+release is published, a second canary downloads the exact released
+`doxygen-awk.awk` asset and checksum, verifies the bytes, and generates the same
+reference documentation.  This catches both source-level regressions before
+release and packaging failures after release while leaving stable Pages
+publication reproducible.
+
+Routine documentation generation includes linked ADR navigation only; it does
+not automatically compose an ADR relationship graph.  ADR-010 governs the
+landing-page generation and shared stable/canary boundary.
 
 ## Diagnostics
 
