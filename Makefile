@@ -17,6 +17,11 @@ BASHDEPS_URL := https://github.com/wesley-dean/bashdeps/releases/download/v$(BAS
 BASHDEPS_SHA256 := acbe79d39ab8cbbf906bd864d410ba7a223ba6f09501c02a409b8d3aa8740462
 VENDOR_AWK_FILTER := $(VENDOR_DIR)/doxygen-awk.awk
 VENDOR_BASH_FILTER := $(VENDOR_DIR)/doxygen-bash.awk
+ADRCTL := $(VENDOR_DIR)/adrctl.bash
+ADR_DIR := doc/adr
+ADR_INDEX_FILE := $(ADR_DIR)/README.md
+ADR_INDEX_INTRO := $(ADR_DIR)/README.intro.md
+ADR_INDEX_OUTRO := $(ADR_DIR)/README.outro.md
 REFERENCE_DOC_DIR := doc/reference
 AWK_DOXYGEN_FILTER ?= $(VENDOR_AWK_FILTER)
 BASH_DOXYGEN_FILTER ?= $(VENDOR_BASH_FILTER)
@@ -25,7 +30,7 @@ VERSION ?= $(shell git describe --tags --always 2>/dev/null || printf '0.0.0-dev
 BUILD_COMMIT ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || printf 'unknown')
 BUILD_DATE ?= $(shell git show -s --format=%cI HEAD 2>/dev/null || printf 'unknown')
 
-.PHONY: all build checksums clean deps-docs deps-docs-check distclean docs docs-canary docs-clean test test-source test-dist verify-bashdeps FORCE
+.PHONY: adr-index all build checksums clean deps-docs deps-docs-check distclean docs docs-canary docs-clean test test-source test-dist verify-bashdeps FORCE
 
 all: build
 
@@ -118,6 +123,21 @@ deps-docs: $(BASHDEPS) $(DOCS_MANIFEST)
 deps-docs-check: verify-bashdeps $(DOCS_MANIFEST)
 	"$(BASHDEPS)" verify "$(DOCS_MANIFEST)"
 
+## Generate the ephemeral ADR landing page from maintained framing and ADR source.
+##
+## This target consumes prepared released-adrctl state and never synchronizes or
+## repairs documentation dependencies.  A same-directory candidate replaces the
+## published intermediate only after successful generation.
+adr-index:
+	@test -r "$(ADRCTL)" || { printf '%s\n' 'Missing documentation dependency vendor/adrctl.bash; run make deps-docs first' >&2; exit 1; }
+	@test -r "$(ADR_INDEX_INTRO)" || { printf '%s\n' 'Missing ADR landing-page introduction' >&2; exit 1; }
+	@test -r "$(ADR_INDEX_OUTRO)" || { printf '%s\n' 'Missing ADR landing-page conclusion' >&2; exit 1; }
+	@tmp="$(ADR_INDEX_FILE).tmp"; \
+	trap 'rm -f "$$tmp"' EXIT; \
+	bash "$(ADRCTL)" generate toc -i "$(ADR_INDEX_INTRO)" -o "$(ADR_INDEX_OUTRO)" >"$$tmp"; \
+	mv "$$tmp" "$(ADR_INDEX_FILE)"; \
+	trap - EXIT
+
 ## Generate stable reference documentation with bashdeps-pinned released filters.
 docs: deps-docs-check
 	$(MAKE) --no-print-directory docs-canary \
@@ -127,14 +147,15 @@ docs: deps-docs-check
 ## Generate reference documentation with explicitly selected filter paths.
 ##
 ## This target is also the common integration-canary path.  It does not acquire
-## or repair dependencies; callers prepare the stable Bash filter separately and
-## may substitute current-source or exact-release AWK filter bytes.
+## or repair dependencies; callers prepare the stable documentation dependencies
+## separately and may substitute current-source or exact-release AWK filter bytes.
 docs-canary:
 	@test -f "$(AWK_DOXYGEN_FILTER)" || { printf '%s\n' 'Missing AWK Doxygen filter' >&2; exit 1; }
 	@test -f "$(BASH_DOXYGEN_FILTER)" || { printf '%s\n' 'Missing Bash Doxygen filter' >&2; exit 1; }
 	chmod 0755 "$(AWK_DOXYGEN_FILTER)" "$(BASH_DOXYGEN_FILTER)"
 	"$(AWK_BIN)" -f "$(AWK_DOXYGEN_FILTER)" -- --strict --compact "$(SOURCE_FILTER)" >/dev/null
 	awk -f "$(BASH_DOXYGEN_FILTER)" -- --strict --compact ./tests/run-tests.sh >/dev/null
+	$(MAKE) --no-print-directory adr-index
 	$(MAKE) --no-print-directory docs-clean
 	AWK_DOXYGEN_FILTER="$(abspath $(AWK_DOXYGEN_FILTER))" \
 	BASH_DOXYGEN_FILTER="$(abspath $(BASH_DOXYGEN_FILTER))" \
@@ -147,6 +168,7 @@ docs-clean:
 clean: docs-clean
 	rm -rf "$(DIST_DIR)"
 
-## Remove all generated build, reference, and dependency state.
+## Remove all generated build, reference, ADR-navigation, and dependency state.
 distclean: clean
 	rm -rf "$(VENDOR_DIR)"
+	rm -f "$(ADR_INDEX_FILE)"

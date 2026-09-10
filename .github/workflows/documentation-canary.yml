@@ -42,6 +42,16 @@ jobs:
             AWK_DOXYGEN_FILTER=doxygen-awk.awk \
             BASH_DOXYGEN_FILTER=vendor/doxygen-bash.awk
 
+      - name: Verify generated documentation state
+        run: |
+          test -f doc/adr/README.md
+          grep -F 'ADR-010' doc/adr/README.md
+          git check-ignore -q doc/adr/README.md
+          test -z "$(git status --porcelain --untracked-files=all -- doc/adr/README.md)"
+          test -f doc/reference/index.html
+          git check-ignore -q doc/reference/index.html
+          test -z "$(git status --porcelain --untracked-files=all -- doc/reference)"
+
   released-artifact:
     name: Released-artifact dogfood
     if: github.event_name == 'release'
@@ -57,7 +67,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes curl doxygen graphviz make
 
-      - name: Prepare stable Bash documentation dependency
+      - name: Prepare stable documentation dependencies
         run: make deps-docs
 
       - name: Download exact released AWK filter and checksum
@@ -89,3 +99,13 @@ jobs:
           make docs-canary \
             AWK_DOXYGEN_FILTER=.release-canary/doxygen-awk.awk \
             BASH_DOXYGEN_FILTER=vendor/doxygen-bash.awk
+
+      - name: Verify generated documentation state
+        run: |
+          test -f doc/adr/README.md
+          grep -F 'ADR-010' doc/adr/README.md
+          git check-ignore -q doc/adr/README.md
+          test -z "$(git status --porcelain --untracked-files=all -- doc/adr/README.md)"
+          test -f doc/reference/index.html
+          git check-ignore -q doc/reference/index.html
+          test -z "$(git status --porcelain --untracked-files=all -- doc/reference)"
