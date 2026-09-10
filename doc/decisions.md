@@ -112,3 +112,14 @@ downloads, verifies, and exercises the exact released `doxygen-awk.awk` asset.
 Neither canary mutates the stable dependency pin, and both complement rather than
 replace focused parser fixtures.  See
 [`ADR-009`](adr/ADR-009-continuously-dogfood-current-and-released-filters.md).
+
+## ADR-010: Publish ephemeral ADR navigation across documentation paths
+
+Stable publication and both ADR-009 canaries generate the same ignored
+`doc/adr/README.md` landing page from maintained intro/outro framing and a linked
+TOC produced by a pinned released adrctl artifact.  The new tool remains in the
+existing documentation-only dependency manifest, while `make adr-index`,
+`make docs`, and `make docs-canary` preserve the offline-after-preparation
+boundary.  Doxygen uses the generated composite as its main page, and routine
+documentation generation remains free of automatic ADR relationship graphs.  See
+[`ADR-010`](adr/ADR-010-publish-ephemeral-adr-navigation-across-documentation-paths.md).
