@@ -4,3 +4,4 @@
 # the network; make deps-docs-check and make docs consume prepared state only.
 id=wesley-dean/awk-doxygen@0.0.3 url=https://github.com/wesley-dean/awk-doxygen/releases/download/v0.0.3/doxygen-awk.awk dest=vendor/doxygen-awk.awk digest=sha256:b45cada53c75be9e52e39651e76bcc377bb9ccfb3a76d16106fe78c704ff8fc5
 id=wesley-dean/bash-doxygen@0.0.14 url=https://github.com/wesley-dean/bash-doxygen/releases/download/v0.0.14/doxygen-bash.awk dest=vendor/doxygen-bash.awk digest=sha256:2f6b71b9bc4bfffefb79d20d0c5e2ad604541101d888335da2457a59f7931c62
+id=wesley-dean/adrctl@0.0.13 url=https://github.com/wesley-dean/adrctl/releases/download/v0.0.13/adrctl.bash dest=vendor/adrctl.bash digest=sha256:5b5c34aeeff59cbadda1f9810c64983555013693139eae4746e979a556149e6e
