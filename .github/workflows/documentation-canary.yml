@@ -67,7 +67,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes curl doxygen graphviz make
 
-      - name: Prepare stable Bash documentation dependency
+      - name: Prepare stable documentation dependencies
         run: make deps-docs
 
       - name: Download exact released AWK filter and checksum
