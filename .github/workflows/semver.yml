@@ -34,20 +34,25 @@ jobs:
           initial_version: 0.0.1
           tag_prefix: v
 
-      - name: Validate maintained source
-        run: make test-source
+      - name: Prepare build dependencies
+        run: make deps
 
-      - name: Build and validate release artifact
+      - name: Validate maintained source
+        run: make check test-source
+
+      - name: Build and validate release artifacts
         run: |
           make test-dist \
             VERSION="${{ steps.calculate-version.outputs.version-string }}"
 
-      - name: Generate and verify release checksum
+      - name: Verify release checksums
         run: |
-          make checksums \
-            VERSION="${{ steps.calculate-version.outputs.version-string }}"
           cd dist
-          sha256sum -c doxygen-awk.awk.sha256
+          for checksum in doxygen-awk.dev.awk.sha256 \
+                          doxygen-awk.awk.sha256 \
+                          doxygen-awk.min.awk.sha256; do
+            sha256sum -c "$checksum"
+          done
 
       - name: Generate release notes
         id: release-notes
@@ -67,5 +72,9 @@ jobs:
           draft: false
           prerelease: false
           files: |
+            dist/doxygen-awk.dev.awk
             dist/doxygen-awk.awk
+            dist/doxygen-awk.min.awk
+            dist/doxygen-awk.dev.awk.sha256
             dist/doxygen-awk.awk.sha256
+            dist/doxygen-awk.min.awk.sha256

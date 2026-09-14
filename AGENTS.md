@@ -43,8 +43,8 @@ security boundaries, and architectural relationships rather than forcing a
 future maintainer to infer them from executable code.
 
 The filter itself is maintained AWK source and should comply with the same
-standard.  Its regression suite includes strict self-validation of documented
-functions and rules, so parser changes must keep source documentation and real
+standard.  Its regression suite includes strict validation of the maintained
+filter documentation, so parser changes must keep source documentation and real
 AWK structure aligned.
 
 ## Architecture and Scope
@@ -108,9 +108,14 @@ Do not use whole-array `delete array` in portable filter code.  Clear arrays by
 iterating over their keys and deleting individual elements unless governance
 changes the compatibility floor.
 
-The active CI suite runs the filter under both `mawk` and GNU awk.  Portability
-claims should continue to be supported by multiple implementations where
-practical.
+The active CI suite runs the semantic filter tests under both `mawk` and GNU awk.
+Portability claims should continue to be supported by multiple implementations
+where practical.
+
+GNU awk is additionally required for `make check`, which runs
+`gawk --lint=fatal` against maintained root AWK source.  This lint requirement is
+a development validation boundary and does not change the portable-AWK runtime
+compatibility floor.
 
 ## Testing
 
@@ -129,11 +134,28 @@ must not be reintroduced into the active regression path.
 Tests protect public behavior, not internal helper structure.  Do not couple
 fixtures to implementation details merely to increase apparent coverage.
 
-The same semantic suite must exercise maintained source and the generated
-`dist/doxygen-awk.awk` artifact.  Preserve tests for strict/non-strict
-diagnostics, compact output, source-line correspondence, portable next-line
-function braces, standalone documented globals, documented action-bearing rules,
-and self-documentation when changing parser structure.
+The same semantic suite must exercise all executable filter forms:
+
+```text
+doxygen-awk.awk
+dist/doxygen-awk.dev.awk
+dist/doxygen-awk.awk
+dist/doxygen-awk.min.awk
+```
+
+The regression harness emits TAP version 13 on standard output.  Detailed
+diagnostic diffs may be written to standard error, but normal standard output
+must remain TAP-compliant.
+
+Distribution artifacts intentionally remove documentation comments.  Strict
+self-documentation testing therefore means each executable artifact must process
+the maintained documented `doxygen-awk.awk` source successfully; do not require
+stripped or minified artifacts to document themselves internally.
+
+Preserve tests for strict/non-strict diagnostics, compact output, source-line
+correspondence, portable next-line function braces, standalone documented
+globals, documented action-bearing rules, and maintained-source documentation
+validation when changing parser structure.
 
 Global-state tests must continue to protect ADR-006's inference boundary: scalar
 and array examples use the same generated pseudo-type, no following assignment
@@ -146,12 +168,39 @@ synthetic prefix; source `@rule` metadata is suppressed; invalid identities are
 diagnosed; pattern-only rules remain unsupported; and generated declarations stay
 on the source rule-header line in default mode.
 
-Run the suite with a selected interpreter using, for example:
+`make test` must not implicitly run linting.  Run the two validation boundaries
+explicitly when both are required:
 
 ```sh
+make check
 make test AWK_BIN=mawk
 make test AWK_BIN=gawk
 ```
+
+A fresh checkout must prepare ordinary build dependencies before `make test` or
+`make build`:
+
+```sh
+make deps
+```
+
+`make deps-check` verifies prepared build dependency state without network access
+or repair.
+
+## Build Dependencies
+
+ADR-011 governs the ordinary build dependency boundary.  Executable build tools
+live in `dependencies.txt` and are materialized beneath `vendor/` through the
+same directly bootstrapped, SHA-256-pinned bashdeps release used elsewhere in the
+repository.
+
+The pinned AWK Minifier release is required to produce
+`dist/doxygen-awk.min.awk`.  `make deps` may use the network; `make deps-check`
+and `make build` consume prepared state only.  Do not add ad hoc downloads to the
+build recipe or silently follow a moving latest minifier release.
+
+`make all` is the convenience path that prepares ordinary dependencies and then
+builds the governed release set.
 
 ## Documentation Dependencies and Publication
 
@@ -163,6 +212,11 @@ The stable documentation build intentionally consumes released filters from
 `vendor/`, including the pinned `awk-doxygen` release rather than the repository's
 maintained source file.  This is a downstream-consumer dogfood boundary, not an
 accidental duplication of the local filter.
+
+Ordinary build dependencies in `dependencies.txt` and documentation-only
+dependencies in `dependencies-docs.txt` are separate trust and lifecycle
+boundaries.  Do not merge them merely because both are synchronized through
+bashdeps.
 
 Use these targets deliberately:
 
@@ -191,34 +245,53 @@ for stable publication.  It should detect source-level integration regressions
 before a release is cut.
 
 The released-artifact canary runs when a GitHub release is published.  It must
-download the exact `doxygen-awk.awk` release asset and checksum, verify those bytes,
-and run the same reference generation with the released artifact.  Do not replace
-this with a tag checkout; packaging and asset publication are part of the consumer
-contract being tested.
+download the exact ordinary `doxygen-awk.awk` release asset and checksum, verify
+those bytes, and run the same reference generation with the released artifact.
+Do not replace this with a tag checkout; packaging and asset publication are part
+of the consumer contract being tested.
+
+ADR-011 expands normal releases with development and minified flavors but keeps
+the ordinary artifact filename and checksum companion stable, so this canary
+continues to protect the downstream compatibility surface.
 
 Canary success does not automatically update `dependencies-docs.txt`.  Stable
 publication pins change only through normal reviewed repository changes.
 
 ## Build and Release
 
-The maintained consumer source and generated artifact are named:
+The maintained source is:
 
 ```text
 doxygen-awk.awk
-dist/doxygen-awk.awk
 ```
 
-`make build` is the canonical build interface.  `make checksums` produces
-`dist/doxygen-awk.awk.sha256`.
+ADR-011 governs three generated executable artifacts:
 
-Build provenance remains comments rather than executable AWK state.  Do not add
-runtime variables, patterns, or `BEGIN` behavior merely to expose version or
+```text
+dist/doxygen-awk.dev.awk
+dist/doxygen-awk.awk
+dist/doxygen-awk.min.awk
+```
+
+Each artifact has a `.sha256` companion.  `make build` is the canonical offline
+build interface after ordinary build dependencies have been prepared and
+verified.  `make all` may prepare dependencies first.  `make checksums` ensures
+all governed checksum companions exist.
+
+The development artifact preserves maintained documentation and comment-only
+build provenance.  The ordinary artifact removes full-line comments while
+preserving the shebang and executable behavior.  The minified artifact is the
+ordinary artifact processed through the pinned released AWK Minifier.
+
+Build provenance must remain comments rather than executable AWK state.  Do not
+add runtime variables, patterns, or `BEGIN` behavior merely to expose version or
 build metadata.
 
-Release publication may be enabled only while the release workflow, artifact
-names, checksum names, and tested build boundary remain aligned with ADR-004.
-The documentation release canary provides an additional check of exact published
-filter bytes after each release.
+Release automation must publish all three executable artifact flavors and all
+three checksum companions, and the same semantic suite must pass against every
+executable flavor before publication.  The documentation release canary provides
+an additional check of the exact published ordinary filter bytes after each
+release.
 
 ## Engineering Approach
 

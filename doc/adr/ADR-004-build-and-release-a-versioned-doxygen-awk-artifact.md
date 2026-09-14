@@ -4,7 +4,7 @@ Date: 2026-09-09
 
 ## Status
 
-Accepted
+Superseded in part by ADR-011
 
 ## Context
 
@@ -92,6 +92,12 @@ establishment and SHALL NOT be re-enabled until all of the following are true:
 The generated `dist/` directory SHALL remain untracked repository state unless a
 later decision explicitly changes that model.
 
+ADR-011 supersedes the single-artifact and single-checksum portions of this
+decision.  The generated-boundary, comment-only provenance, maintained-source
+name, and untracked-distribution principles remain in force.  Under ADR-011,
+the provenance-bearing generated form is `dist/doxygen-awk.dev.awk`, while the
+ordinary compatibility artifact remains `dist/doxygen-awk.awk`.
+
 ## Considered Alternatives
 
 ### Release the maintained source directly
@@ -138,6 +144,9 @@ The implementation phase must update build variables, test harness environment
 names, checksums, and release workflow references together so there is no mixed
 Bash/AWK release boundary.
 
+ADR-011 expands the resulting release set after that initial establishment while
+retaining the ordinary artifact filename for compatibility.
+
 ## Related Decisions
 
 - Related to ADR-000, which prohibits misrepresenting inherited scaffolding as a
@@ -145,3 +154,4 @@ Bash/AWK release boundary.
 - Builds on ADR-001, which defines the filter's governed AWK scope.
 - ADR-005 requires the same behavior-focused suite to exercise maintained and
   generated filter bytes.
+- ADR-011 supersedes the single-artifact and single-checksum release shape.

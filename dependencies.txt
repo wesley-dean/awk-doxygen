@@ -1,0 +1,4 @@
+# Build dependencies synchronized by the released vendor/bashdeps.bash bootstrap.
+# Keep each dependency on one physical line for compatibility with bashdeps.
+
+id=wesley-dean/awk-minifier@0.2.4 url=https://github.com/wesley-dean/awk-minifier/releases/download/v0.2.4/awk-minifier.awk dest=vendor/awk-minifier.awk digest=sha256:9668287c394a48e6143b63074fea8ab9fed240ef0637ac169780e08e30661803
