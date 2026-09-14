@@ -47,12 +47,12 @@ documentation rather than public arguments.  See
 
 ## ADR-004: Build and release a versioned doxygen-awk artifact
 
-The maintained and released filter is named `doxygen-awk.awk`.  Release builds
-will create `dist/doxygen-awk.awk`, add version/build/commit provenance as
-comments, and publish a standard `doxygen-awk.awk.sha256` checksum without adding
-runtime metadata state.  Automatic releases remain disabled until the AWK
-implementation, AWK regression suite, generated artifact, checksum, and release
-workflow all describe the same verified consumer contract.  See
+The maintained source is named `doxygen-awk.awk`, and the project retains the
+generated-artifact boundary, comment-only provenance model, and untracked
+`dist/` state established here.  ADR-011 supersedes this decision's original
+single-artifact and single-checksum release shape; the provenance-bearing form is
+now `dist/doxygen-awk.dev.awk`, while `dist/doxygen-awk.awk` remains the ordinary
+compatibility artifact.  See
 [`ADR-004`](adr/ADR-004-build-and-release-a-versioned-doxygen-awk-artifact.md).
 
 ## ADR-005: Use small behavior-focused regression fixtures
@@ -123,3 +123,14 @@ existing documentation-only dependency manifest, while `make adr-index`,
 boundary.  Doxygen uses the generated composite as its main page, and routine
 documentation generation remains free of automatic ADR relationship graphs.  See
 [`ADR-010`](adr/ADR-010-publish-ephemeral-adr-navigation-across-documentation-paths.md).
+
+## ADR-011: Expand release artifacts and build validation
+
+Normal releases now publish development, ordinary, and minified AWK artifacts,
+each with its own SHA-256 checksum.  AWK Minifier v0.2.4 is pinned in the ordinary
+build dependency manifest, `make check` provides GNU awk `--lint=fatal`
+validation, and the same behavior-focused semantic suite exercises maintained
+source plus all three generated artifacts while emitting TAP version 13.  The
+ordinary `doxygen-awk.awk` filename remains stable so the pinned documentation
+and exact-release canary contracts continue to work.  See
+[`ADR-011`](adr/ADR-011-expand-release-artifacts-and-build-validation.md).
