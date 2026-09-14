@@ -98,7 +98,7 @@ check:
 	@command -v gawk >/dev/null 2>&1 || { printf '%s\n' 'gawk is required for make check' >&2; exit 1; }
 	@for source in $(AWK_SOURCES); do \
 		printf '%s\n' "Linting $$source"; \
-		gawk --lint=fatal -f "$$source" </dev/null >/dev/null; \
+		gawk --lint=fatal -v strict=0 -v compact=0 -f "$$source" </dev/null >/dev/null; \
 	done
 
 ## Run one TAP stream against maintained source and all generated artifacts.
