@@ -29,5 +29,11 @@ jobs:
       - name: Install AWK implementations
         run: sudo apt-get update && sudo apt-get install --yes gawk mawk
 
-      - name: Run test suite
+      - name: Prepare build dependencies
+        run: make deps
+
+      - name: Lint maintained AWK source
+        run: make check
+
+      - name: Run TAP test suite
         run: make test AWK_BIN="${{ matrix.awk }}"
