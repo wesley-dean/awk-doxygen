@@ -325,7 +325,7 @@ including:
 Normal mode reports diagnostics while continuing translation.  Strict mode
 reports the same diagnostics and exits non-zero.
 
-## Build and release artifact
+## Build and release artifacts
 
 The maintained filter is:
 
@@ -333,44 +333,103 @@ The maintained filter is:
 doxygen-awk.awk
 ```
 
-`make build` generates the consumer artifact:
+AWK Minifier is an ordinary build dependency pinned in `dependencies.txt` and
+materialized as `vendor/awk-minifier.awk` through the repository's verified
+`bashdeps` bootstrap.  Prepare build dependencies with:
+
+```sh
+make deps
+```
+
+Verify already-prepared build dependencies without network access or repair with:
+
+```sh
+make deps-check
+```
+
+`make all` prepares dependencies and builds the release set.  `make build`
+remains offline with respect to dependency acquisition and requires the pinned
+minifier to have been prepared first.
+
+The build produces three executable artifacts:
 
 ```text
+dist/doxygen-awk.dev.awk
 dist/doxygen-awk.awk
+dist/doxygen-awk.min.awk
 ```
 
-The generated file preserves the AWK shebang and records version, build date,
-and source commit provenance as comments so build metadata cannot change AWK
-runtime behavior.
+`doxygen-awk.dev.awk` is the full generated development artifact.  It preserves
+the maintained source documentation and records version, build date, and source
+commit provenance as comments.
 
-`make checksums` produces:
+`doxygen-awk.awk` is the ordinary compatibility artifact.  It is derived from the
+development artifact by removing full-line comments while preserving the AWK
+shebang and executable behavior.  This filename remains the stable consumer
+surface used by the documentation dependency and release-canary contracts.
+
+`doxygen-awk.min.awk` is produced by running the ordinary artifact through the
+pinned released AWK Minifier.
+
+Each executable artifact has its own SHA-256 companion:
 
 ```text
+dist/doxygen-awk.dev.awk.sha256
 dist/doxygen-awk.awk.sha256
+dist/doxygen-awk.min.awk.sha256
 ```
 
-Release automation publishes the generated AWK artifact and its checksum when
-versioning is enabled.  ADR-004 governs that release boundary, while ADR-009 adds
-a post-release canary that verifies and exercises the exact published artifact.
+Release automation verifies and publishes all six files.  ADR-011 governs the
+expanded release boundary and partially supersedes ADR-004's original
+single-artifact release shape.
 
-## Testing
+## Testing and linting
 
-Run the complete regression suite from the repository root:
+Run GNU awk linting against maintained root AWK sources with:
+
+```sh
+make check
+```
+
+`make check` requires `gawk` and uses `--lint=fatal`.  GNU awk is a development
+validation dependency for this target, not the runtime compatibility floor; the
+filter remains portable-AWK source and the semantic suite still runs under both
+`mawk` and GNU awk.
+
+Run the complete regression matrix from the repository root with:
 
 ```sh
 make test
 ```
 
-Select a particular AWK implementation with `AWK_BIN`:
+`make test` does not invoke linting.  It requires prepared build dependencies,
+builds the three generated artifacts, verifies their flavor/checksum invariants,
+and runs the same semantic suite against:
+
+```text
+doxygen-awk.awk
+dist/doxygen-awk.dev.awk
+dist/doxygen-awk.awk
+dist/doxygen-awk.min.awk
+```
+
+The regression harness emits TAP version 13 on standard output.  Select a
+particular AWK implementation with `AWK_BIN`:
 
 ```sh
 make test AWK_BIN=mawk
 make test AWK_BIN=gawk
 ```
 
+For narrower validation, `make test-source` exercises maintained source only,
+while `make test-dist` builds and exercises all three generated artifacts.
+
 CI exercises both `mawk` and GNU awk.  The active AWK suite uses small
-behavior-focused fixtures under `tests/awk/` and runs the same semantic cases
-against the maintained source and generated consumer artifact.
+behavior-focused fixtures under `tests/awk/` and protects the same semantic
+contracts across every executable form.  Self-documentation validation uses the
+maintained documented `doxygen-awk.awk` source as input even when the executable
+filter under test is stripped or minified, because those distribution flavors
+intentionally omit their own Doxygen comments.
 
 The suite covers file documentation, zero-parameter functions, caller-visible
 parameters, conventional locals, a conventional local array, portable next-line
@@ -379,8 +438,8 @@ and arrays, EOF global blocks, global/source non-association, documented `BEGIN`
 and `END` rules, ordinary action-bearing and action-only rules, invalid rule
 identities, unsupported pattern-only association, descriptive Doxygen directives,
 ignored undocumented source, validation failures, default source-line
-correspondence, compact output, and strict self-validation of the filter's own
-governed documentation.
+correspondence, compact output, and strict self-validation of the maintained
+filter documentation.
 
 The inherited Bash fixtures remain in the repository only as inactive historical
 scaffolding and are not referenced by the AWK regression harness.
