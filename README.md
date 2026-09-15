@@ -18,7 +18,7 @@ and implementation may diverge wherever AWK semantics require it.
 The normative, reusable AWK source-documentation standard is:
 
 ```text
-doc/documentation-standard.md
+doc/standards/awk/documentation-standard.md
 ```
 
 The standard preserves the verbose, intent-oriented documentation philosophy
@@ -444,12 +444,24 @@ filter documentation.
 The inherited Bash fixtures remain in the repository only as inactive historical
 scaffolding and are not referenced by the AWK regression harness.
 
+## Shared coding standards
+
+This repository adopts the complete pinned `coding_standards@v1.0.9` snapshot
+under `doc/standards/`.  Provenance is recorded in `.codingstandardrc`.  Applicable
+imported standards are governing requirements unless an accepted repository ADR or
+explicit local policy refines them; language-specific standards apply only where
+their subject matter is relevant.  Imported files are not edited locally, and
+future standards updates are reviewed as ordinary repository changes.
+
+The authoritative AWK source-documentation standard is
+`doc/standards/awk/documentation-standard.md`.
+
 ## Governance
 
 Repository work is governed by:
 
 - `AGENTS.md`;
-- `doc/documentation-standard.md`;
+- `doc/standards/awk/documentation-standard.md`;
 - ADRs in `doc/adr/`; and
 - concise ADR summaries in `doc/decisions.md`.
 

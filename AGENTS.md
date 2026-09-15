@@ -18,7 +18,7 @@ Before proposing or making changes, review at minimum:
 
 1. `README.md`
 2. this file
-3. `doc/documentation-standard.md`
+3. `doc/standards/awk/documentation-standard.md`
 4. every ADR in `doc/adr/*.md`
 5. `doc/decisions.md`
 
@@ -29,7 +29,7 @@ a new or superseding ADR is required.
 
 ## Documentation Standard
 
-`doc/documentation-standard.md` is the normative source-documentation standard
+`doc/standards/awk/documentation-standard.md` is the normative source-documentation standard
 for maintained AWK source in this repository and is intended to be reusable by
 other AWK projects.
 
@@ -46,6 +46,21 @@ The filter itself is maintained AWK source and should comply with the same
 standard.  Its regression suite includes strict validation of the maintained
 filter documentation, so parser changes must keep source documentation and real
 AWK structure aligned.
+
+## Shared Coding Standards
+
+The repository adopts the complete pinned `coding_standards@v1.0.9` snapshot
+under `doc/standards/`.  `.codingstandardrc` records the upstream release and
+verified archive digest.  Applicable imported standards are repository governance;
+accepted repository-specific ADRs and explicit local policy may refine or
+supersede them.  Presence in the complete snapshot does not by itself make a
+language-specific standard applicable, and files under `doc/standards/examples/`
+are illustrative unless a governing standard states otherwise.
+
+Do not edit imported standards locally.  Shared changes belong upstream in
+`wesley-dean/coding_standards`; repository-specific exceptions belong in local
+governance.  Standards updates are reviewed repository changes rather than an
+automatic synchronization process.
 
 ## Architecture and Scope
 

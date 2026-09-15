@@ -134,3 +134,15 @@ source plus all three generated artifacts while emitting TAP version 13.  The
 ordinary `doxygen-awk.awk` filename remains stable so the pinned documentation
 and exact-release canary contracts continue to work.  See
 [`ADR-011`](adr/ADR-011-expand-release-artifacts-and-build-validation.md).
+
+## ADR-012: Adopt shared coding standards
+
+The repository commits the complete verified `coding_standards@v1.0.9`
+snapshot beneath `doc/standards/` and records release provenance in
+`.codingstandardrc`.  Applicable imported standards govern the repository
+unless an accepted local ADR or explicit policy refines them; presence does
+not imply applicability, and imported examples remain illustrative.  The
+duplicate repository-local AWK documentation standard is removed so
+`doc/standards/awk/documentation-standard.md` is the single live shared
+source-documentation standard.  See
+[`ADR-012`](adr/ADR-012-adopt-shared-coding-standards.md).

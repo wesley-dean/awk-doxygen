@@ -10,7 +10,7 @@ The repository separates documentation by responsibility:
 
 - [`README.md`](../../README.md) provides project orientation, supported behavior,
   usage, build, release, and testing guidance.
-- [`doc/documentation-standard.md`](../documentation-standard.md) defines the
+- [`doc/standards/awk/documentation-standard.md`](../documentation-standard.md) defines the
   reusable AWK source-documentation standard.
 - [`doc/decisions.md`](../decisions.md) provides concise summaries of the
   architecture decisions represented below.
