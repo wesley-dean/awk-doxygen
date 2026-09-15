@@ -4,6 +4,17 @@ This document provides concise summaries of the architecture decisions governing
 `awk-doxygen`.  The ADRs themselves remain authoritative; these summaries are
 navigation aids rather than substitutes for the full decisions.
 
+## Maintenance
+
+Every ADR in this repository uses `Accepted` as its status.  Merging a pull
+request that contains a new or materially changed ADR is generally understood to
+accept that ADR; supersession, replacement, deprecation, and similar relationships
+belong in the ADR narrative rather than in alternate status values.  Each ADR
+must have a corresponding summary here of generally three to five sentences with
+a direct reference to the ADR.  Adding or materially changing an ADR requires
+reviewing and updating that summary in the same pull request, including earlier
+summaries affected by a superseding or refining decision.
+
 ## ADR-000: Capability scope and epistemic honesty
 
 The project prioritizes accuracy, explicit capability boundaries, evidence,
