@@ -4,6 +4,17 @@ This document provides concise summaries of the architecture decisions governing
 `awk-doxygen`.  The ADRs themselves remain authoritative; these summaries are
 navigation aids rather than substitutes for the full decisions.
 
+## Maintenance
+
+Every ADR in this repository uses `Accepted` as its status.  Merging a pull
+request that contains a new or materially changed ADR is generally understood to
+accept that ADR; supersession, replacement, deprecation, and similar relationships
+belong in the ADR narrative rather than in alternate status values.  Each ADR
+must have a corresponding summary here of generally three to five sentences with
+a direct reference to the ADR.  Adding or materially changing an ADR requires
+reviewing and updating that summary in the same pull request, including earlier
+summaries affected by a superseding or refining decision.
+
 ## ADR-000: Capability scope and epistemic honesty
 
 The project prioritizes accuracy, explicit capability boundaries, evidence,
@@ -134,3 +145,15 @@ source plus all three generated artifacts while emitting TAP version 13.  The
 ordinary `doxygen-awk.awk` filename remains stable so the pinned documentation
 and exact-release canary contracts continue to work.  See
 [`ADR-011`](adr/ADR-011-expand-release-artifacts-and-build-validation.md).
+
+## ADR-012: Adopt shared coding standards
+
+The repository commits the complete verified `coding_standards@v1.0.9`
+snapshot beneath `doc/standards/` and records release provenance in
+`.codingstandardrc`.  Applicable imported standards govern the repository
+unless an accepted local ADR or explicit policy refines them; presence does
+not imply applicability, and imported examples remain illustrative.  The
+duplicate repository-local AWK documentation standard is removed so
+`doc/standards/awk/documentation-standard.md` is the single live shared
+source-documentation standard.  See
+[`ADR-012`](adr/ADR-012-adopt-shared-coding-standards.md).
