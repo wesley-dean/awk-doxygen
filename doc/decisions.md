@@ -148,7 +148,7 @@ and exact-release canary contracts continue to work.  See
 
 ## ADR-012: Adopt shared coding standards
 
-The repository commits the complete verified `coding_standards@v1.0.9`
+The repository commits the complete verified `coding_standards@v2.1.0`
 snapshot beneath `doc/standards/` and records release provenance in
 `.codingstandardrc`.  Applicable imported standards govern the repository
 unless an accepted local ADR or explicit policy refines them; presence does

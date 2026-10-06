@@ -49,7 +49,7 @@ AWK structure aligned.
 
 ## Shared Coding Standards
 
-The repository adopts the complete pinned `coding_standards@v1.0.9` snapshot
+The repository adopts the complete pinned `coding_standards@v2.1.0` snapshot
 under `doc/standards/`.  `.codingstandardrc` records the upstream release and
 verified archive digest.  Applicable imported standards are repository governance;
 accepted repository-specific ADRs and explicit local policy may refine or

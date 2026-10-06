@@ -446,7 +446,7 @@ scaffolding and are not referenced by the AWK regression harness.
 
 ## Shared coding standards
 
-This repository adopts the complete pinned `coding_standards@v1.0.9` snapshot
+This repository adopts the complete pinned `coding_standards@v2.1.0` snapshot
 under `doc/standards/`.  Provenance is recorded in `.codingstandardrc`.  Applicable
 imported standards are governing requirements unless an accepted repository ADR or
 explicit local policy refines them; language-specific standards apply only where
