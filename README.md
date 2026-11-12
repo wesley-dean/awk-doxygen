@@ -444,9 +444,22 @@ filter documentation.
 The inherited Bash fixtures remain in the repository only as inactive historical
 scaffolding and are not referenced by the AWK regression harness.
 
+## Dependabot maintenance
+
+Scheduled GitHub Actions version updates run weekly with a seven-day cooldown
+and the wildcard `actions-version-updates` group.  Routine major, minor, and
+patch updates are eligible to be grouped, while Dependabot security updates
+remain independent of the routine group.  The existing non-major auto-merge
+guard remains unchanged; major-containing groups require normal review.
+
+The group does not retroactively replace currently open Dependabot PRs.
+An effective CODEOWNERS requirement and security-update enablement must be
+verified in GitHub settings, not inferred from repository files alone.  See
+[ADR-013](doc/adr/ADR-013-consolidate-scheduled-github-actions-updates.md).
+
 ## Shared coding standards
 
-This repository adopts the complete pinned `coding_standards@v2.1.0` snapshot
+This repository adopts the complete pinned `coding_standards@v3.2.0` snapshot
 under `doc/standards/`.  Provenance is recorded in `.codingstandardrc`.  Applicable
 imported standards are governing requirements unless an accepted repository ADR or
 explicit local policy refines them; language-specific standards apply only where

@@ -148,7 +148,7 @@ and exact-release canary contracts continue to work.  See
 
 ## ADR-012: Adopt shared coding standards
 
-The repository commits the complete verified `coding_standards@v2.1.0`
+The repository commits the complete verified `coding_standards@v3.2.0`
 snapshot beneath `doc/standards/` and records release provenance in
 `.codingstandardrc`.  Applicable imported standards govern the repository
 unless an accepted local ADR or explicit policy refines them; presence does
@@ -157,3 +157,17 @@ duplicate repository-local AWK documentation standard is removed so
 `doc/standards/awk/documentation-standard.md` is the single live shared
 source-documentation standard.  See
 [`ADR-012`](adr/ADR-012-adopt-shared-coding-standards.md).
+
+## ADR-013: Consolidate scheduled GitHub Actions dependency updates
+
+**Status:** Accepted
+
+Routine GitHub Actions version updates use the existing weekly schedule and
+seven-day cooldown, with one wildcard `actions-version-updates` group covering
+major, minor, and patch releases.  The group explicitly applies only to routine
+version updates: security updates remain independent and require separate
+GitHub configuration.  Existing non-major auto-merge safeguards, required
+checks, repository permissions, and CODEOWNER review are preserved, while
+large grouped changes receive risk-based validation.  This does not promise
+one PR per week or retroactively replace open Dependabot PRs.  See
+[ADR-013](adr/ADR-013-consolidate-scheduled-github-actions-updates.md).
