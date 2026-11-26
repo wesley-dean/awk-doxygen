@@ -444,18 +444,19 @@ filter documentation.
 The inherited Bash fixtures remain in the repository only as inactive historical
 scaffolding and are not referenced by the AWK regression harness.
 
-## Dependabot maintenance
+## Dependency maintenance
 
-Scheduled GitHub Actions version updates run weekly with a seven-day cooldown
-and the wildcard `actions-version-updates` group.  Routine major, minor, and
-patch updates are eligible to be grouped, while Dependabot security updates
-remain independent of the routine group.  The existing non-major auto-merge
-guard remains unchanged; major-containing groups require normal review.
+Routine dependency updates are managed by the centrally hosted Jenkins Renovate
+service, with explicit repository enrollment in `renovate.json`.  Dependabot
+routine GitHub Actions version-update PRs are disabled while Dependabot security
+updates and vulnerability alerts are retained.  The existing Dependabot
+non-major auto-merge workflow remains scoped to `dependabot[bot]`, including
+security update PRs; Renovate is subject to independent repository review and
+CI protections.  See [ADR-014](doc/adr/ADR-014-migrate-routine-dependency-updates-to-centrally-managed-renovate.md).
 
-The group does not retroactively replace currently open Dependabot PRs.
-An effective CODEOWNERS requirement and security-update enablement must be
-verified in GitHub settings, not inferred from repository files alone.  See
-[ADR-013](doc/adr/ADR-013-consolidate-scheduled-github-actions-updates.md).
+Operational readiness requires confirming `wesley-dean-renovate` collaborator
+write access, effective GitHub security settings, and a successful Jenkins run.
+Existing routine Dependabot PRs are retired after the migration is effective.
 
 ## Shared coding standards
 
