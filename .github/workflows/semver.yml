@@ -21,7 +21,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # pin@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -56,7 +56,7 @@ jobs:
 
       - name: Generate release notes
         id: release-notes
-        uses: RedCrafter07/release-notes-action@304edb57ff4d0cb822b39a00556c015790dee977 # pin@v1.0.2
+        uses: RedCrafter07/release-notes-action@304edb57ff4d0cb822b39a00556c015790dee977 # v1.0.2
         with:
           tag-name: "v${{ steps.calculate-version.outputs.version-string }}"
           token: "${{ secrets.GITHUB_TOKEN }}"
