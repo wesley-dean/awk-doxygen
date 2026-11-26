@@ -171,3 +171,16 @@ checks, repository permissions, and CODEOWNER review are preserved, while
 large grouped changes receive risk-based validation.  This does not promise
 one PR per week or retroactively replace open Dependabot PRs.  See
 [ADR-013](adr/ADR-013-consolidate-scheduled-github-actions-updates.md).
+
+## ADR-014: Migrate routine dependency updates to centrally managed Renovate
+
+**Status:** Accepted
+
+The repository replaces scheduled Dependabot version updates with centralized
+Jenkins-run Renovate, enrolled through `renovate.json`.  Dependabot security
+updates, vulnerability alerts, existing non-major security PR auto-merge
+controls, immutable pins, and mandatory human review remain separate and
+preserved.  ADR-014 partially supersedes ADR-013's active routine grouping
+policy and prior prohibition on a restrictive PR limit.  Machine account
+write access and effective GitHub protection settings require separate
+verification.  See [ADR-014](adr/ADR-014-migrate-routine-dependency-updates-to-centrally-managed-renovate.md).
